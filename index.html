@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<!--
+  Senet v1.0
+  Copyright (C) 2026 Alessandro Valli
+  SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Senet, il gioco egizio del passaggio, nel browser: regole CEMEA e Kendall e Bell, legnetti 3D, audio e storia.">
+<title>Senet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=Marcellus&display=swap" rel="stylesheet">
+<style>
+/* Layout: tavoliere e comandi nella stessa schermata su display larghi; sotto, impostazioni e cronaca; regole in fondo. Faience azzurra, giunti scuri, glifi in avorio. */
+:root{
+  --bg:#dbe8ea; --surface:#eaf2f3; --fg:#12303a; --muted:#47646e; --line:#b2cbd0;
+  --p0:#efe4c4; --p0-hi:#fff8e2; --p1:#2c2b35; --p1-hi:#5a5968; --cap:#b3321a;
+  --shell:#f6efd9; --halo:#12303a; --halo-board:#fff6d6;
+  --font-display:'Marcellus',Georgia,serif;
+  --font-body:'Alegreya Sans',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1b20; --surface:#15272e; --fg:#e4f0f2; --muted:#9bb5bc; --line:#2c444c; --halo:#f6efd9; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1b20; --surface:#15272e; --fg:#e4f0f2; --muted:#9bb5bc; --line:#2c444c; --halo:#f6efd9; color-scheme:dark}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 17px/1.45 var(--font-body);
+  padding-block:20px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1160px;margin-inline:auto;display:grid;gap:22px}
+h1,h2{font-family:var(--font-display);font-weight:400;margin:0;text-wrap:balance}
+h1{font-size:clamp(30px,5.4vw,48px);line-height:1.05;letter-spacing:.02em}
+h2{font-size:21px;letter-spacing:.03em}
+.top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 22px}
+.sub{margin:0;color:var(--muted);font-size:16px;min-width:0}
+.eyebrow{font:500 12px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+#board{display:block;width:100%;height:auto;max-width:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.num{fill:#5d5142;stroke:#efe7d3;stroke-width:70;paint-order:stroke;font:500 240px var(--font-mono)}
+.hide-nums .num{display:none}
+.lbl{fill:var(--muted);font:500 220px var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
+.ros-a{fill:#2f55a8;stroke:#1b2f66;stroke-width:36;stroke-linejoin:round}
+.ros-b{fill:#b04a3c;stroke:#6a2a21;stroke-width:36;stroke-linejoin:round}
+
+.piece{transition:transform .5s cubic-bezier(.3,.7,.2,1)}
+.piece .shadow{fill:#000;opacity:.32}
+.piece .disc{stroke:var(--shell);stroke-width:60}
+.piece.p0 .disc{fill:url(#gp0)}
+.piece.p1 .disc{fill:url(#gp1)}
+.piece .pips circle{fill:var(--shell)}
+.piece .halo{fill:none;stroke:var(--halo);stroke-width:80;opacity:0;pointer-events:none}
+.piece.onb .halo{stroke:var(--halo-board)}
+.piece.movable{cursor:pointer}
+.piece.movable .halo{opacity:.6;animation:pulse 1.5s ease-in-out infinite}
+.piece.selected .halo{opacity:1;animation:none;stroke-width:130}
+.piece:focus{outline:none}
+.piece:focus-visible .halo{opacity:1;stroke-dasharray:240 140}
+@keyframes pulse{50%{opacity:.15}}
+.ghost{cursor:pointer;stroke:var(--halo-board);stroke-width:80;stroke-dasharray:200 130;fill:none;opacity:.55}
+.ghost.off{stroke:var(--halo)}
+.ghost.p0{fill:color-mix(in srgb,var(--p0) 32%,transparent)}
+.ghost.p1{fill:color-mix(in srgb,var(--p1) 32%,transparent)}
+.ghost.sel{opacity:1;stroke-width:110}
+.ghost.cap{stroke:var(--cap)}
+
+.deck{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.play{display:grid;gap:14px}
+.dice-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px}
+#diceCanvas{display:block;width:min(100%,400px);aspect-ratio:400/130;height:auto;flex:0 1 400px;min-width:0}
+.dice{display:flex;gap:8px}
+.die{width:52px;height:48px;overflow:visible}
+.die polygon{fill:#3f62b8;stroke:#1c2a55;stroke-width:1.6;stroke-linejoin:round}
+.die .facet{fill:none;stroke:#1c2a55;stroke-width:1;opacity:.5}
+.die .tw{fill:#fffdf4;stroke:#1c2a55;stroke-width:1.2}
+.die .tb{fill:#111114}
+.dice.idle .die{opacity:.5}
+.dice.rolling .die{animation:wob .22s linear infinite}
+@keyframes wob{25%{transform:rotate(-9deg)}75%{transform:rotate(9deg)}}
+.result{display:flex;align-items:baseline;gap:10px}
+.result .big{font:500 44px/1 var(--font-mono);font-variant-numeric:tabular-nums;min-width:1ch}
+.result .cap{color:var(--muted);font-size:16px}
+.status{margin:0;min-height:3.9em;font-size:18px;text-wrap:pretty}
+.status b{font-weight:700}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.btn{font:700 17px var(--font-body);letter-spacing:.02em;border-radius:8px;border:1.5px solid var(--fg);
+  background:var(--fg);color:var(--bg);padding:12px 24px;cursor:pointer;min-height:46px}
+.btn.alt{background:transparent;color:var(--fg)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+
+.score{display:grid;gap:12px}
+.pcard{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;padding:12px 14px;border:1.5px solid var(--line);border-radius:8px}
+.pcard.active{border-color:var(--fg)}
+.sw{width:26px;height:26px;border-radius:50%;border:3px solid;grid-row:span 2}
+.sw.p0{background:var(--p0)} .sw.p1{background:var(--p1)} .sw{border-color:color-mix(in srgb,var(--fg) 30%,transparent)}
+.pname{font:400 20px var(--font-display);letter-spacing:.03em;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.tag{font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.meter{display:flex;gap:5px;flex-wrap:wrap}
+.meter i{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--muted);display:block}
+.meter i.on{background:var(--fg);border-color:var(--fg)}
+.meta{grid-column:2;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
+.pot{display:flex;justify-content:space-between;gap:10px;font:500 14px var(--font-mono);color:var(--muted);padding-inline:2px}
+
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:28px;align-items:start}
+form{display:grid;gap:16px;margin-top:12px}
+fieldset{border:0;padding:0;margin:0;display:grid;gap:7px;min-width:0}
+legend{padding:0;margin-bottom:7px;font:500 12px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg label{position:relative;display:block}
+.seg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.seg span{display:block;padding:9px 14px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface)}
+.seg input:checked + span{border-color:var(--fg);background:var(--fg);color:var(--bg)}
+.seg input:focus-visible + span{outline:3px solid var(--fg);outline-offset:2px}
+.chk{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.chk input{margin-top:.28em;width:18px;height:18px;accent-color:var(--fg)}
+.chk small{display:block;color:var(--muted);font-size:14.5px;line-height:1.35}
+.chk.off{opacity:.45}
+.log{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:0;max-height:330px;overflow-y:auto;border-top:1px solid var(--line)}
+.log li{display:flex;gap:10px;align-items:baseline;padding:7px 2px;border-bottom:1px solid var(--line);font-size:16px}
+.log .dot{flex:none;width:10px;height:10px;border-radius:50%;transform:translateY(1px)}
+.log .dot.p0{background:var(--p0)} .log .dot.p1{background:var(--p1)} .log .dot.n{background:var(--muted)}
+.log li.sys{color:var(--muted)}
+
+details.rules{border-top:1px solid var(--line);padding-top:16px}
+details.rules summary{cursor:pointer;font:400 21px var(--font-display);letter-spacing:.03em}
+.rcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:8px 32px;margin-top:14px}
+.rcols h3{font:500 12px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 0 6px}
+.rcols ul{margin:0;padding-left:1.1em;display:grid;gap:5px}
+.rcols li{max-width:62ch;text-wrap:pretty}
+.rcols p{margin:0;max-width:62ch}
+
+@media (max-width:820px){.deck,.lower{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.lbl,.num{display:none}.status{font-size:17px}.die{width:44px;height:40px}.panel{padding:14px}}
+@media (prefers-reduced-motion:reduce){.piece{transition:none}.piece.movable .halo,.dice.rolling .die{animation:none}}
+
+.hbtns{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px}
+.tut{position:fixed;inset:0;z-index:50;background:rgba(8,11,15,.76);display:grid;place-items:center;
+  padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.tut-box{width:min(1080px,100%);max-height:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:12px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+.tut-box:focus{outline:none}
+.tut-head{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.tut-head h2{font-size:23px}
+.tut-head .seg span{padding:7px 12px}
+.tut-body{overflow-y:auto;padding:16px 18px 20px;display:flex;flex-direction:column;gap:16px}
+.tut-body>*{flex:none}
+.sd{display:inline-block;width:13px;height:13px;border-radius:50%}.sd.p0{background:var(--p0)}.sd.p1{background:var(--p1)}
+.tut-fig{min-width:0;overflow-x:auto}
+.tsvg{display:block;width:100%;min-width:640px;height:auto}
+.tsvg .num{display:block;font-size:330px}
+.tsvg .lbl{display:block}
+.tsvg.noanim .piece{transition:none}
+.mk{stroke-width:100}
+.mk-ok{fill:rgba(46,125,79,.22);stroke:#2e7d4f}
+.mk-no{fill:rgba(179,50,26,.18);stroke:#b3321a}
+.mk-cap{fill:rgba(179,50,26,.12);stroke:#b3321a;stroke-dasharray:220 140}
+.mk-g{fill:none;stroke-width:140;stroke-linecap:round;stroke-linejoin:round}
+.mk-g.ok{stroke:#2e7d4f}.mk-g.no{stroke:#b3321a}
+.tut-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--surface);font-size:16px}
+.chip.ok{border-color:#2e7d4f}.chip.no{border-color:#b3321a}
+.chip .g{font-weight:700}.chip.ok .g{color:#2e7d4f}.chip.no .g{color:#b3321a}
+.chip.res{opacity:.3;transition:opacity .4s}
+.tut-fig.played .chip.res,.tut-fig.still .chip.res{opacity:1}
+.chip.win{border-color:var(--fg);font-weight:700}
+.dd{width:17px;height:17px}
+.tut-text h3{font:400 25px var(--font-display);letter-spacing:.02em;margin:0 0 8px}
+.tut-text p{margin:0 0 9px;max-width:72ch;text-wrap:pretty}
+.tut-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--line)}
+.tut-foot .btn{padding:10px 18px;min-height:42px}
+.tut-dots{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;flex:1 1 220px}
+.tut-dots button{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--muted);background:transparent;padding:0;cursor:pointer}
+.tut-dots button[aria-current="true"]{background:var(--fg);border-color:var(--fg)}
+.dt{display:grid;gap:8px}
+.dtr{display:grid;grid-template-columns:minmax(160px,auto) 52px minmax(0,1fr) minmax(120px,170px);gap:10px 16px;align-items:center;padding:9px 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.dtd{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dtd .die{width:36px;height:33px}
+.who{font:400 17px var(--font-display);min-width:3.6em}
+.who.p0{color:var(--p0)}.who.p1{color:var(--p1)}
+.dtv{font:500 34px/1 var(--font-mono);text-align:center}
+.dtt{display:grid;gap:1px;min-width:0}.dtt span{color:var(--muted);font-size:15.5px}
+.dtp{display:grid;gap:3px;font:500 13px var(--font-mono);color:var(--muted)}
+.bar{display:block;height:9px;border-radius:5px;background:var(--line);overflow:hidden}.bar i{display:block;height:100%;background:var(--fg)}
+.flow{list-style:none;counter-reset:s;margin:0;padding:0;display:grid;gap:8px}
+.flow li{counter-increment:s;display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:start;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.flow li::before{content:counter(s);font:500 15px var(--font-mono);width:28px;height:28px;border-radius:50%;border:1.5px solid var(--fg);display:grid;place-items:center}
+@media (max-width:720px){.dtr{grid-template-columns:minmax(0,1fr) 44px}.dtt,.dtp{grid-column:1/-1}.tut-head h2{font-size:20px}}
+
+.dice.p1 .die polygon{fill:#b8503f;stroke:#4d1a14}
+.dice.p1 .die .facet{stroke:#4d1a14}
+.story{position:fixed;inset:0;z-index:60;background:radial-gradient(ellipse at 50% 45%,#2b2014 0%,#0f0b08 58%,#050403 100%);color:#eadfc6;overflow:hidden;display:grid;place-items:center}
+.story canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.st-bar{position:absolute;left:0;right:0;height:10vh;min-height:48px;background:#000;z-index:2}
+.st-bar.t{top:0}.st-bar.b{bottom:0}
+.st-card{position:relative;z-index:1;text-align:center;width:min(780px,88vw);opacity:0;will-change:opacity,transform}
+.st-art{height:clamp(80px,19vh,180px);margin-bottom:clamp(14px,3vh,28px);display:flex;justify-content:center}
+.st-art:empty{display:none}
+.st-art svg{height:100%;width:auto;max-width:100%;overflow:visible}
+.st-kick{font:500 13px var(--font-mono);letter-spacing:.3em;text-transform:uppercase;color:#bda468;margin:0 0 16px}
+.st-kick:empty{display:none}
+.st-title{font:400 clamp(34px,8vw,84px)/1.05 var(--font-display);text-transform:uppercase;margin:0 0 18px;color:#f3e8ca;text-shadow:0 0 34px rgba(214,170,90,.35)}
+.st-title:empty{display:none}
+.st-body{font:400 clamp(19px,2.7vw,30px)/1.55 var(--font-display);margin:0;color:#e6dbbf;text-wrap:balance}
+.st-card.small .st-body{font-size:clamp(16px,2vw,20px);color:#b9ad92}
+.st-ui{position:absolute;z-index:4;left:0;right:0;bottom:0;min-height:48px;height:10vh;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;
+  padding:0 max(12px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(12px,env(safe-area-inset-left,0px))}
+.st-ui button{font:500 15px var(--font-body);color:#eadfc6;background:transparent;border:1px solid #6b5b3a;border-radius:6px;padding:7px 14px;cursor:pointer;min-height:38px}
+.st-ui button:hover{border-color:#bda468}
+.st-ui button:focus-visible{outline:2px solid #eadfc6;outline-offset:2px}
+.st-prog{position:absolute;z-index:5;left:0;bottom:0;height:3px;width:0;background:#bda468}
+.st-end{position:absolute;z-index:3;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+.st-end.on{display:flex}
+.st-end button{font:500 17px var(--font-body);color:#eadfc6;background:transparent;border:1px solid #bda468;border-radius:6px;padding:10px 20px;cursor:pointer;min-width:200px}
+@media (min-width:1000px){
+  body{padding-block:12px 40px}
+  .wrap{max-width:1560px;gap:12px}
+  .stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,24vw);gap:18px;align-items:start}
+  .stage .deck{grid-template-columns:minmax(0,1fr);gap:12px}
+  .stage .panel{padding:14px}
+  .stage #diceCanvas{width:100%;flex:1 1 100%}
+  .stage .pcard{padding:10px 14px}
+}
+.ver{font:500 13px var(--font-mono);letter-spacing:.06em;padding:2px 7px;border:1px solid var(--line);border-radius:5px;margin-right:2px}
+.num{fill:#eaf7f5;stroke:#0a3a4a;stroke-width:50;paint-order:stroke;font:500 190px var(--font-mono)}
+.lbl{fill:#bfe3e8;stroke:none;font:500 200px var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
+.gs,.gf{fill:none;stroke-width:62;stroke-linecap:round;stroke-linejoin:round}
+.gs{stroke:rgba(4,38,50,.55);transform:translate(24px,30px)}
+.gf{stroke:#f6efd9}
+.gf .fl{fill:#f6efd9;stroke:none}
+.piece .shadow{opacity:.38}
+.piece .disc{stroke:rgba(0,0,0,.5);stroke-width:34}
+.piece.p0 .disc{fill:url(#gp0)}
+.piece.p1 .disc{fill:url(#gp1)}
+.piece .cone{fill:url(#gcone);stroke:#b6a572;stroke-width:22}
+.piece .tip{fill:#fffdf4}
+.piece .grv{fill:none;stroke:#7b7a8c;stroke-width:44}
+.piece .grv2{fill:#14131a;stroke:#7b7a8c;stroke-width:28}
+.piece .halo{stroke-width:70}
+.piece.stuck .disc{stroke:#e8573b;stroke-width:70}
+.ghost.back{stroke-dasharray:60 120}
+.sw.p0{background:var(--p0)} .sw.p1{background:var(--p1)}
+.stk{width:24px;height:64px}
+.die{width:48px;height:48px}
+.dice{gap:10px}
+.dtd .stk{width:18px;height:48px}.dtd .die{width:44px;height:44px}
+.dtr{grid-template-columns:minmax(120px,auto) 52px minmax(0,1fr) minmax(120px,170px)}
+.tsvg .lbl{display:block}
+.tsvg .num{display:block}
+.piece .tip,.piece .cone{pointer-events:none}
+.hide-nums .num{display:none}
+@media (max-width:640px){.lbl,.num{display:none}.tsvg .num,.tsvg .lbl{display:none}}
+@media (min-width:1000px){
+  body{padding-block:12px 40px}
+  .wrap{max-width:1560px;gap:12px}
+  .stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,24vw);gap:18px;align-items:start}
+  .stage .deck{grid-template-columns:minmax(0,1fr);gap:12px}
+  .stage .panel{padding:14px}
+  .stage #diceCanvas{width:100%;flex:1 1 100%}
+  .stage .pcard{padding:10px 14px}
+}
+
+</style>
+</head>
+<body>
+
+<main class="wrap">
+  <header class="top">
+    <h1>Senet</h1>
+    <p class="sub"><span class="ver">v1.0</span> · Il gioco egizio del «passaggio»: trenta caselle, cinque o sette pedine a testa, un viaggio verso l'aldilà.</p>
+    <div class="hbtns"><button type="button" class="btn alt" id="storyBtn">Avvia la storia</button><button type="button" class="btn alt" id="tutBtn">Regole illustrate</button></div>
+  </header>
+
+  <div class="stage">
+  <svg id="board" viewBox="0 0 10800 5160" role="group" aria-label="Tavoliere del Senet">
+    <defs>
+      <linearGradient id="gtq" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#58c6cf"/><stop offset=".55" stop-color="#2fa2b6"/><stop offset="1" stop-color="#23869f"/></linearGradient>
+      <linearGradient id="gtq2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#2a93ad"/><stop offset=".5" stop-color="#46b9c6"/><stop offset="1" stop-color="#2b9db3"/></linearGradient>
+      <radialGradient id="gp0" cx=".36" cy=".32" r=".85"><stop offset="0" stop-color="#fffaf0"/><stop offset=".6" stop-color="#ecdfba"/><stop offset="1" stop-color="#bba978"/></radialGradient>
+      <radialGradient id="gp1" cx=".36" cy=".32" r=".85"><stop offset="0" stop-color="#5b5a6a"/><stop offset=".6" stop-color="#2b2a34"/><stop offset="1" stop-color="#14131a"/></radialGradient>
+      <radialGradient id="gcone" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#fffdf6"/><stop offset="1" stop-color="#d8c998"/></radialGradient>
+      <marker id="arrh0" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto"><path d="M0 0L10 5L0 10z" fill="#fff0bd" stroke="#6a5a2a" stroke-width="1"/></marker>
+      <marker id="arrh1" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto"><path d="M0 0L10 5L0 10z" fill="#12181f"/></marker>
+      <marker id="arrhk" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff7a59"/></marker>
+      <marker id="arrhm" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.4" markerHeight="3.4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d9eef0"/></marker>
+    </defs>
+    <g id="frame"></g><g id="tiles"></g><g id="glyphs"></g>
+    <g id="nums"></g><g id="lbls"></g>
+    <g id="pieces"></g><g id="ghosts"></g>
+  </svg>
+
+  <section class="deck">
+    <div class="panel play" aria-live="polite">
+      <div class="dice-row">
+        <canvas id="diceCanvas" width="400" height="130" aria-hidden="true"></canvas>
+        <div class="dice idle" id="dice" aria-hidden="true" hidden></div>
+        <div class="result"><span class="big" id="big">–</span><span class="cap" id="capt">in attesa del primo lancio</span></div>
+      </div>
+      <p class="status" id="status"></p>
+      <div class="actions">
+        <button type="button" class="btn" id="rollBtn">Tira i legnetti</button>
+        <button type="button" class="btn alt" id="exitBtn" hidden>Porta fuori la pedina in 30</button>
+        <button type="button" class="btn alt" id="againBtn" hidden>Nuova partita</button>
+      </div>
+    </div>
+    <div class="score">
+      <div class="pcard" id="pc0"></div>
+      <div class="pcard" id="pc1"></div>
+    </div>
+  </section>
+  </div>
+
+  <section class="lower">
+    <div>
+      <h2>Impostazioni</h2>
+      <form id="opts" autocomplete="off">
+        <fieldset><legend>Regole</legend>
+          <div class="seg">
+            <label><input type="radio" name="rules" value="kendall" checked><span>CEMEA · 4 legnetti</span></label>
+            <label><input type="radio" name="rules" value="uninerd"><span>Kendall e Bell · dado</span></label>
+          </div></fieldset>
+        <fieldset><legend>Avversario</legend>
+          <div class="seg">
+            <label><input type="radio" name="opp" value="cpu" checked><span>Computer</span></label>
+            <label><input type="radio" name="opp" value="two"><span>Due giocatori</span></label>
+          </div></fieldset>
+        <fieldset><legend>Pedine a testa</legend>
+          <div class="seg">
+            <label><input type="radio" name="npc" value="7" checked><span>7 · regole CEMEA</span></label>
+            <label><input type="radio" name="npc" value="5"><span>5 · regole Kendall e Bell</span></label>
+          </div></fieldset>
+        <fieldset><legend>Tavoliere</legend>
+          <label class="chk"><input type="checkbox" id="optNums" checked><span>Numera le caselle del percorso</span></label>
+        </fieldset>
+        <fieldset><legend>Audio</legend>
+          <label class="chk"><input type="checkbox" id="optSfx" checked><span>Effetti sonori</span></label>
+          <label class="chk"><input type="checkbox" id="optMusic"><span>Colonna sonora<small>Musica d'ambiente di ispirazione egizia, generata dal browser. Vale anche per la storia.</small></span></label>
+        </fieldset>
+        <div class="actions"><button type="button" class="btn" id="newBtn">Nuova partita</button></div>
+      </form>
+    </div>
+    <div>
+      <h2>Cronaca</h2>
+      <ol class="log" id="log"></ol>
+    </div>
+  </section>
+
+  <details class="rules">
+    <summary>Regole, interpretazioni e fonti</summary>
+    <div class="rcols">
+      <div>
+        <h3>Scopo</h3>
+        <p>Portare fuori dal tavoliere, nell'aldilà, tutte le proprie pedine prima dell'avversario. Il percorso ha 30 caselle disposte in tre file da 10 e si legge a serpentina: la prima fila da sinistra a destra (1-10), la seconda da destra a sinistra (11-20), la terza da sinistra a destra (21-30).</p>
+        <h3>Lancio</h3>
+        <ul>
+          <li>CEMEA: quattro legnetti con una faccia bianca e una nera. Si conta il numero di facce bianche: 1, 2, 3 o 4; nessuna faccia bianca vale 6.</li>
+          <li>Kendall e Bell: un dado a sei facce (1-5 e X). La X non muove nulla.</li>
+          <li>Con 1, 4 e 6 (legnetti) oppure 1, 4 e 5 (dado) si muove e si rilancia; con 2 e 3 si muove e si passa la mano.</li>
+        </ul>
+        <h3>Movimento</h3>
+        <ul>
+          <li>Una pedina avanza esattamente del punteggio ottenuto. Non si può terminare su una propria pedina.</li>
+          <li>Se si termina su una pedina avversaria, le due pedine si scambiano di posto.</li>
+          <li>Due pedine dello stesso colore in caselle contigue formano un muro che non si può attaccare, ma si può superare. Tre pedine consecutive formano un muro invalicabile.</li>
+          <li>Se nessuna pedina può avanzare, se ne fa retrocedere una a scelta del punteggio ottenuto; se neppure questo è possibile, si passa.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Le cinque case</h3>
+        <ul>
+          <li>15, casa della rinascita: la pedina non può essere attaccata.</li>
+          <li>26, casa dell'abbondanza: protetta. Con un 1 la pedina può saltare la casa della malasorte e andare in 28.</li>
+          <li>27, casa della malasorte: la pedina torna in 15. Se la 15 è occupata da una pedina avversaria, il giocatore resta bloccato con tutte le pedine finché non ottiene 4, che porta fuori la pedina sventurata.</li>
+          <li>28, 29 e 30: rifugi, le pedine non si possono attaccare. Si esce con il punteggio esatto indicato: 3 dalla 28 (III), 2 dalla 29 (II), 1 dalla 30 (I).</li>
+          <li>Kendall e Bell: all'inizio del turno la pedina in 30 può uscire senza lancio, ma solo se il giocatore non ha altre pedine nella prima fila.</li>
+        </ul>
+        <h3>Inizio</h3>
+        <ul>
+          <li>Le pedine partono alternate sulle prime caselle: 14 con sette pedine a testa, 10 con cinque.</li>
+          <li>CEMEA: si lancia a turno finché uno ottiene 1; chi ci riesce comincia e occupa le caselle pari. Kendall e Bell: comincia chi ottiene il punteggio più alto (la X vale meno di tutti), che occupa le caselle pari; la prima mossa spetta alla pedina in casella 10.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Interpretazioni adottate</h3>
+        <ul>
+          <li>Le fonti non sono univoche e le regole originali non ci sono pervenute: le versioni sono ricostruzioni. Qui sono tenute distinte la ricostruzione del gruppo CEMEA (7 pedine, legnetti) e quella di Kendall e Bell (5 pedine, dado).</li>
+          <li>Casa dell'abbondanza: «saltare la malasorte» con un 1 è interpretato come passaggio diretto dalla 26 alla 28. Le fonti non dicono altro.</li>
+          <li>Casa della malasorte con la 15 occupata da una propria pedina: la pedina riparte dalla prima casella libera. Con la 15 occupata dall'avversario si resta bloccati: così le due regole sui «pezzi propri» e sulla «15 occupata» non si contraddicono.</li>
+          <li>Il 4 che libera la pedina bloccata la porta fuori dal tavoliere e conta come pedina in salvo, come previsto dalla regola CEMEA. Le fonti non precisano altro.</li>
+          <li>Le pedine in 28, 29 e 30 lasciano la casella solo con il punteggio esatto. Il movimento all'indietro del «tiro nullo» è consentito solo verso caselle libere.</li>
+          <li>Vince chi porta fuori per primo tutte le pedine. In epoca antica, secondo l'articolo, entrambi dovevano arrivare in fondo e chi era uscito per primo assisteva l'altro: qui non è implementato.</li>
+        </ul>
+        <h3>Fonti</h3>
+        <ul>
+          <li>Voce «Senet», Wikipedia, che riporta le regole del gruppo di ricerca sul gioco dei CEMEA (set CEMEA).</li>
+          <li>Regole di Timothy Kendall e R.C. Bell, nell'adattamento UniNerd (set Kendall e Bell).</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+</main>
+
+<div class="story" id="story" role="dialog" aria-modal="true" aria-label="La storia del Senet" hidden>
+  <canvas id="stCv" aria-hidden="true"></canvas>
+  <div class="st-bar t"></div><div class="st-bar b"></div>
+  <div class="st-card" id="stCard"><div class="st-art" id="stArt"></div><p class="st-kick" id="stKick"></p><h2 class="st-title" id="stTitle"></h2><p class="st-body" id="stBody"></p></div>
+  <div class="st-end" id="stEnd"><button type="button" id="stAgain">Rivedi la storia</button><button type="button" id="stBack">Torna al gioco</button></div>
+  <div class="st-ui">
+    <button type="button" id="stPrev">‹ Indietro</button>
+    <button type="button" id="stPause">Pausa</button>
+    <button type="button" id="stNext">Avanti ›</button>
+    <button type="button" id="stMus">Colonna sonora: no</button>
+    <button type="button" id="stClose">Chiudi</button>
+  </div>
+  <div class="st-prog" id="stProg"></div>
+</div>
+
+<div class="tut" id="tut" role="dialog" aria-modal="true" aria-labelledby="tutTitle" hidden>
+  <div class="tut-box" id="tutBox" tabindex="-1">
+    <div class="tut-head">
+      <div><span class="eyebrow" id="tutStep"></span><h2 id="tutTitle">Regole illustrate</h2></div>
+      <div class="seg" id="tutSeg" role="radiogroup" aria-label="Set di regole">
+        <label><input type="radio" name="trules" value="kendall"><span>CEMEA</span></label>
+        <label><input type="radio" name="trules" value="uninerd"><span>Kendall e Bell</span></label>
+      </div>
+      <button type="button" class="btn alt" id="tutClose">Chiudi</button>
+    </div>
+    <div class="tut-body">
+      <div class="tut-fig" id="tutFig"></div>
+      <div class="tut-text" id="tutText"></div>
+    </div>
+    <div class="tut-foot">
+      <button type="button" class="btn alt" id="tutPrev">Indietro</button>
+      <div class="tut-dots" id="tutDots"></div>
+      <button type="button" class="btn alt" id="tutReplay">Riproduci</button>
+      <button type="button" class="btn" id="tutNext">Avanti</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/*ENGINE_START*/
+const NAMES = ['Avorio', 'Ebano'];
+const OUT = 31;
+const SAFE = [15, 26, 28, 29, 30];
+const EXIT_NEED = { 28: 3, 29: 2, 30: 1 };
+const AGAIN = { kendall: [1, 4, 6], uninerd: [1, 4, 5] };
+const nDev = st => (st.rules === 'kendall' ? 4 : 1);
+
+function newState(o) {
+  const n = o.n || (o.rules === 'kendall' ? 7 : 5), first = o.first || 0, pieces = [];
+  for (let p = 0; p < 2; p++) for (let i = 0; i < n; i++) {
+    const even = p === first;
+    pieces.push({ id: p * n + i, owner: p, pos: even ? 2 * (i + 1) : 2 * i + 1 });
+  }
+  return {
+    rules: o.rules, n, turn: first, first, pieces, phase: 'roll', roll: null, moves: [],
+    again: false, newTurn: true, firstMove: true, stuck: [null, null], winner: null, turns: 0, fx: null
+  };
+}
+
+/* lancio: kendall = 4 legnetti (true = faccia bianca); uninerd = dado a sei facce (la 6 è la X) */
+function rollThrow(st, rng) {
+  if (st.rules === 'kendall') {
+    const f = []; for (let i = 0; i < 4; i++) f.push(rng() < 0.5);
+    const w = f.filter(Boolean).length;
+    return { faces: f, v: w === 0 ? 6 : w };
+  }
+  const f = 1 + Math.floor(rng() * 6);
+  return { faces: [f], v: f === 6 ? 0 : f };
+}
+/* v: valore di movimento (kendall 1,2,3,4,6; uninerd 1-5, 0 = X) */
+function rankOf(st, v) { return v; }
+
+function describeRoll(st, v) {
+  const again = AGAIN[st.rules].includes(v);
+  let head;
+  if (st.rules === 'kendall') head = v === 6 ? 'Nessuna faccia bianca: 6' : v + (v === 1 ? ' faccia bianca' : ' facce bianche') + ': ' + v;
+  else head = v === 0 ? 'Dado: X' : 'Dado: ' + v;
+  let text;
+  if (v === 0) text = 'Il turno passa senza alcuna azione.';
+  else text = 'Muovi una pedina di ' + v + (v === 1 ? ' casella' : ' caselle') + (again ? ' e rilancia.' : ' e passa la mano.');
+  return { head, text, again };
+}
+
+const at = (st, s) => st.pieces.find(x => x.pos === s) || null;
+function runLen(st, o, s) {
+  let a = s, b = s;
+  while (a > 1 && at(st, a - 1) && at(st, a - 1).owner === o) a--;
+  while (b < 30 && at(st, b + 1) && at(st, b + 1).owner === o) b++;
+  return b - a + 1;
+}
+function immune(st, s) {
+  const pc = at(st, s); if (!pc) return false;
+  return SAFE.includes(s) || runLen(st, pc.owner, s) >= 2;
+}
+function wallBlocks(st, p, a, b) {
+  for (let s = a; s <= b; s++) { const pc = at(st, s); if (pc && pc.owner !== p && runLen(st, pc.owner, s) >= 3) return true; }
+  return false;
+}
+function stuckPiece(st, p) {
+  const id = st.stuck[p]; if (id == null) return null;
+  const pc = st.pieces[id]; return pc.pos === 27 ? pc : null;
+}
+const freeAfter = st => { for (let s = 1; s <= 30; s++) if (!at(st, s)) return s; return null; };
+
+function genMoves(st, v) {
+  const p = st.turn, mine = st.pieces.filter(x => x.owner === p && x.pos < OUT), moves = [];
+  if (v === 0) return moves;
+  const sp = stuckPiece(st, p);
+  if (sp) { if (v === 4) moves.push({ kind: 'exit', id: sp.id, from: 27, to: OUT, cap: null, v }); return moves; }
+  for (const pc of mine) {
+    const s = pc.pos;
+    if (EXIT_NEED[s]) { if (v === EXIT_NEED[s]) moves.push({ kind: 'exit', id: pc.id, from: s, to: OUT, cap: null, v }); continue; }
+    const targets = [s + v]; if (s === 26 && v === 1) targets.push(28);
+    for (const t of targets) {
+      if (t > 30) continue;
+      if (wallBlocks(st, p, s + 1, t)) continue;
+      const q = at(st, t);
+      if (q) { if (q.owner === p || immune(st, t)) continue; }
+      moves.push({ kind: t === s + v ? 'move' : 'jump', id: pc.id, from: s, to: t, cap: q ? q.id : null, v });
+    }
+  }
+  let res = moves;
+  if (st.firstMove && st.rules === 'uninerd') { const f = moves.filter(m => m.from === 10); if (f.length) res = f; }
+  if (!res.length) {
+    for (const pc of mine) {
+      const s = pc.pos, t = s - v;
+      if (t < 1 || at(st, t) || wallBlocks(st, p, t, s - 1)) continue;
+      res.push({ kind: 'back', id: pc.id, from: s, to: t, cap: null, v });
+    }
+  }
+  return res;
+}
+
+function endTurn(st) {
+  st.turn = 1 - st.turn; st.phase = 'roll'; st.moves = []; st.again = false; st.newTurn = true; st.turns++;
+}
+
+function applyRoll(st, th) {
+  const p = st.turn, ev = [], v = th.v;
+  st.fx = null;
+  const info = { p, faces: th.faces, v, ev, again: AGAIN[st.rules].includes(v) };
+  st.roll = info;
+  st.moves = genMoves(st, v);
+  if (!st.moves.length) {
+    ev.push({ p, msg: NAMES[p] + (v === 0 ? ': dado X, il turno passa.' : ': nessuna mossa possibile, il turno passa.') });
+    st.firstMove = false; endTurn(st); info.status = 'pass';
+  } else { st.phase = 'move'; info.status = 'move'; }
+  return info;
+}
+
+function freeExit(st) {
+  if (st.rules !== 'uninerd' || st.phase !== 'roll' || !st.newTurn || st.winner != null) return null;
+  const p = st.turn, pc = st.pieces.find(x => x.owner === p && x.pos === 30);
+  if (!pc) return null;
+  if (st.pieces.some(x => x.owner === p && x.pos >= 1 && x.pos <= 10)) return null;
+  return pc.id;
+}
+function applyFreeExit(st) {
+  const p = st.turn, pc = st.pieces[freeExit(st)], ev = []; st.fx = { mover: pc.id };
+  pc.pos = OUT; st.newTurn = false;
+  const n = st.pieces.filter(x => x.owner === p && x.pos === OUT).length;
+  ev.push({ p, msg: NAMES[p] + ' porta nell\'aldilà la pedina in casella 30 (' + n + '/' + st.n + ').' });
+  if (n === st.n) { st.phase = 'over'; st.winner = p; ev.push({ p, msg: NAMES[p] + ' vince la partita.' }); }
+  return ev;
+}
+
+function applyMove(st, m) {
+  const p = st.turn, ev = [], pc = st.pieces[m.id], v = st.roll.v;
+  st.fx = { mover: pc.id };
+  st.firstMove = false;
+  if (m.kind === 'exit') {
+    pc.pos = OUT;
+    const n = st.pieces.filter(x => x.owner === p && x.pos === OUT).length;
+    ev.push({ p, msg: NAMES[p] + (m.from === 27 ? ' esce con un 4 dalla casella della malasorte' : ' porta nell\'aldilà la pedina in casella ' + m.from) + ' (' + n + '/' + st.n + ').' });
+  } else {
+    if (m.kind === 'back') ev.push({ p, msg: NAMES[p] + ' retrocede dalla casella ' + m.from + ' alla ' + m.to + '.' });
+    else if (m.kind === 'jump') ev.push({ p, msg: NAMES[p] + ' salta la casa della malasorte: dalla 26 alla 28.' });
+    else ev.push({ p, msg: NAMES[p] + ' muove dalla casella ' + m.from + ' alla ' + m.to + '.' });
+    if (m.cap != null) {
+      const q = st.pieces[m.cap]; q.pos = m.from;
+      ev.push({ p, msg: NAMES[p] + ' attacca: ' + NAMES[1 - p] + ' e ' + NAMES[p] + ' si scambiano di posto (' + m.to + ' e ' + m.from + ').' });
+    }
+    pc.pos = m.to;
+    if (pc.pos === 27) {
+      const o = at(st, 15);
+      if (!o) { st.fx.via = 27; pc.pos = 15; ev.push({ p, msg: 'Casa della malasorte: la pedina di ' + NAMES[p] + ' torna alla casa della rinascita (15).' }); }
+      else if (o.owner === p) {
+        const f = freeAfter(st); st.fx.via = 27; pc.pos = f;
+        ev.push({ p, msg: 'Casa della malasorte: la 15 è occupata da una pedina di ' + NAMES[p] + ', la pedina riparte dalla casella ' + f + '.' });
+      } else { st.stuck[p] = pc.id; ev.push({ p, msg: 'Casa della malasorte: la 15 è occupata da ' + NAMES[1 - p] + '. ' + NAMES[p] + ' resta bloccato finché non ottiene 4.' }); }
+    }
+  }
+  if (st.pieces.filter(x => x.owner === p && x.pos === OUT).length === st.n) {
+    st.phase = 'over'; st.winner = p; st.moves = [];
+    ev.push({ p, msg: NAMES[p] + ' vince la partita.' }); return ev;
+  }
+  if (AGAIN[st.rules].includes(v)) {
+    st.phase = 'roll'; st.moves = []; st.again = true; st.newTurn = false;
+    ev.push({ p, msg: NAMES[p] + ' rilancia.' });
+  } else endTurn(st);
+  return ev;
+}
+
+function cpuChoose(st, rng) {
+  const p = st.turn; let best = 0, bs = -1e9;
+  st.moves.forEach((m, i) => {
+    let s = 0;
+    if (m.kind === 'exit') s += 100;
+    else {
+      const adv = m.to - m.from; s += adv * 2.2;
+      if (m.kind === 'back') s -= 10;
+      if (m.cap != null) s += 22 + (m.to - m.from) * 1.5;
+      if (SAFE.includes(m.to)) s += m.to === 15 ? 8 : 16;
+      if (m.to === 27) s -= at(st, 15) && at(st, 15).owner !== p ? 90 : 35;
+      if (m.kind === 'jump') s += 18;
+      if (EXIT_NEED[m.to]) s += 6;
+      /* muri */
+      const mine = s2 => { const q = at(st, s2); return q && q.owner === p && q.id !== m.id; };
+      const nb = (mine(m.to - 1) ? 1 : 0) + (mine(m.to + 1) ? 1 : 0);
+      const nbOld = (mine(m.from - 1) ? 1 : 0) + (mine(m.from + 1) ? 1 : 0);
+      s += nb * 9 - nbOld * 7;
+      if (m.from <= 10 && m.to > 10) s += 2;
+      if (m.from === 15 || m.from === 26) s -= 4;
+    }
+    s += rng() * 3;
+    if (s > bs) { bs = s; best = i; }
+  });
+  return best;
+}
+/*ENGINE_END*/
+
+</script>
+<script>
+(function(){
+'use strict';
+const $=(s,r)=>(r||document).querySelector(s);
+const NS='http://www.w3.org/2000/svg';
+/* geometria: caselle da 1000 unità, tre file da dieci, vassoi dell'aldilà sotto il tavoliere */
+const S=1000,G=40,M=220;
+const X=c=>M+c*(S+G), Y=r=>M+r*(S+G);
+const cellOf=s=>s<=10?{c:s-1,r:0}:(s<=20?{c:20-s,r:1}:{c:s-21,r:2});
+const ctr=(c,r)=>({x:X(c)+S/2,y:Y(r)+S/2});
+const sqXY=s=>{const q=cellOf(s);return ctr(q.c,q.r);};
+const TRAY=[220,5560], TW=5020, TY=3700, TH=1260, SC=.62;
+const slot=(p,i)=>({x:TRAY[p]+330+i*700,y:TY+800});
+
+const svg=$('#board'), pl=$('#pieces'), gl=$('#ghosts');
+const els={};
+let st, gen=0, busy=false, rolling=false, selected=null, note='', cpuOn=true;
+const isCpu=p=>cpuOn&&p===1;
+const SPECIAL=[15,26,27,28,29,30];
+
+/* tavoliere: faience azzurra, giunti scuri, glifi in avorio */
+const GL={
+  15:()=>'<ellipse cx="0" cy="-200" rx="135" ry="175"/><path d="M0 -25V390M-235 70H235"/>',
+  26:()=>'<path d="M0 -380V230M-170 -310H170M-110 -170H110"/><ellipse cx="0" cy="330" rx="105" ry="105"/>',
+  27:()=>[-1,0,1].map(k=>{const y=k*190;return '<path d="M-340 '+y+'L-226 '+(y-90)+'L-113 '+y+'L0 '+(y-90)+'L113 '+y+'L226 '+(y-90)+'L340 '+y+'"/>';}).join(''),
+  28:()=>'<path d="M-230 -300V300M0 -300V300M230 -300V300"/>',
+  29:()=>'<path d="M-380 -90Q0 -380 380 -90Q0 200 -380 -90Z"/><circle cx="0" cy="-90" r="95"/><path d="M-410 -300Q0 -470 410 -300"/><path d="M-70 160V250M70 160V250" />',
+  30:()=>'<circle cx="0" cy="-70" r="235"/><circle cx="0" cy="-70" r="62" class="fl"/><path d="M0 250V400"/>'
+};
+function boardLayers(){
+  const L={};
+  const w=10800,h=3520;
+  let f='<rect width="'+w+'" height="'+h+'" rx="170" fill="#17566e"/><rect x="40" y="40" width="'+(w-80)+'" height="'+(h-80)+'" rx="140" fill="none" stroke="#0a2c3a" stroke-width="26"/>'
+    +'<rect x="'+(M-50)+'" y="'+(M-50)+'" width="'+(10*S+9*G+100)+'" height="'+(3*S+2*G+100)+'" rx="30" fill="#0a2c3a"/>';
+  [0,1].forEach(p=>{
+    f+='<rect x="'+TRAY[p]+'" y="'+TY+'" width="'+TW+'" height="'+TH+'" rx="150" fill="#12475c" stroke="#0a2c3a" stroke-width="26"/>';
+    for(let i=0;i<7;i++){const q=slot(p,i);f+='<circle class="tslot" data-i="'+i+'" cx="'+q.x+'" cy="'+q.y+'" r="'+(400*SC+30)+'" fill="rgba(0,0,0,.2)"/>';}
+  });
+  const y0=ctr(0,0).y,y1=ctr(0,1).y,y2=ctr(0,2).y,ym1=(y0+y1)/2,ym2=(y1+y2)/2;
+  f+='<g fill="none" stroke="#d9eef0" stroke-width="34" stroke-linecap="round" opacity=".75">'
+    +'<path d="M10560 '+y0+'Q10705 '+y0+' 10705 '+ym1+'Q10705 '+y1+' 10560 '+y1+'" marker-end="url(#arrhm)"/>'
+    +'<path d="M240 '+y1+'Q95 '+y1+' 95 '+ym2+'Q95 '+y2+' 240 '+y2+'" marker-end="url(#arrhm)"/></g>';
+  L.frame=f;
+  let t='',gl='',n='';
+  for(let s=1;s<=30;s++){
+    const q=cellOf(s), x=X(q.c), y=Y(q.r), sp=SPECIAL.includes(s), a=(s*37)%7;
+    t+='<g><rect x="'+x+'" y="'+y+'" width="'+S+'" height="'+S+'" rx="70" fill="url(#'+(s%2?'gtq':'gtq2')+')" stroke="#0a2c3a" stroke-width="22"/>'
+      +'<rect x="'+(x+38)+'" y="'+(y+38)+'" width="'+(S-76)+'" height="'+(S-76)+'" rx="46" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="14"/>'
+      +'<circle cx="'+(x+200+a*90)+'" cy="'+(y+260+((a*53)%5)*100)+'" r="'+(150+a*20)+'" fill="rgba(255,255,255,.07)"/><circle cx="'+(x+760-a*50)+'" cy="'+(y+720-((a*31)%4)*90)+'" r="'+(120+a*14)+'" fill="rgba(5,50,70,.09)"/>'
+      +(sp?'<rect x="'+(x+70)+'" y="'+(y+70)+'" width="'+(S-140)+'" height="'+(S-140)+'" rx="40" fill="none" stroke="#f3ecd8" stroke-width="12" stroke-dasharray="60 34" opacity=".55"/>':'')+'</g>';
+    if(GL[s]){const c=ctr(q.c,q.r);gl+='<g transform="translate('+c.x+' '+(c.y+(s===29||s===28?20:0))+')"><g class="gs">'+GL[s]()+'</g><g class="gf">'+GL[s]()+'</g></g>';}
+    n+='<text class="num" x="'+(x+60)+'" y="'+(y+200)+'">'+s+'</text>';
+  }
+  L.tiles=t; L.glyphs=gl; L.nums=n;
+  L.lbls='<text class="lbl" x="'+(TRAY[0]+130)+'" y="'+(TY+215)+'">Aldilà · Avorio</text><text class="lbl" x="'+(TRAY[1]+130)+'" y="'+(TY+215)+'">Aldilà · Ebano</text>';
+  return L;
+}
+const BL=boardLayers();
+$('#frame').innerHTML=BL.frame;$('#tiles').innerHTML=BL.tiles;$('#glyphs').innerHTML=BL.glyphs;$('#nums').innerHTML=BL.nums;$('#lbls').innerHTML=BL.lbls;
+
+const pieceInner=o=>o===0
+  ?'<circle class="shadow" cx="30" cy="60" r="400"/><circle class="disc" r="400"/><circle class="cone" r="250"/><circle class="tip" r="85"/>'
+  :'<circle class="shadow" cx="30" cy="60" r="400"/><circle class="disc" r="400"/><circle class="grv" r="285"/><circle class="grv2" r="140"/>';
+function mkPiece(pc){
+  const g=document.createElementNS(NS,'g');
+  g.setAttribute('class','piece p'+pc.owner); g.dataset.id=pc.id;
+  g.innerHTML='<circle class="halo" r="500"/>'+pieceInner(pc.owner);
+  pl.appendChild(g); els[pc.id]=g; return g;
+}
+
+/* ===== lancio: legnetti (3D) o dado (3D), con ripiego 2D ===== */
+const tally=n=>{let s='';for(let i=0;i<n;i++)s+='<rect x="'+(24-(n-1)*5+i*10-1.6)+'" y="12" width="3.2" height="24" rx="1.4" fill="#f6efd9"/>';return s;};
+function diceHTML(faces){
+  if(st&&st.rules==='uninerd'){
+    const f=faces[0];
+    return '<svg class="die" viewBox="0 0 48 48"><rect x="3" y="3" width="42" height="42" rx="9" fill="#2a93ad" stroke="#0a2c3a" stroke-width="2"/>'
+      +(f===6?'<path d="M15 15L33 33M33 15L15 33" stroke="#f6efd9" stroke-width="4" stroke-linecap="round"/>':tally(f))+'</svg>';
+  }
+  return faces.map(w=>'<svg class="stk" viewBox="0 0 26 70"><rect x="3" y="2" width="20" height="66" rx="7" fill="'+(w?'#f6efd9':'#14161a')+'" stroke="#0a2c3a" stroke-width="2"/></svg>').join('');
+}
+function setDice(faces,cls){const d=$('#dice');d.className='dice '+(cls||'');d.innerHTML=diceHTML(faces);}
+
+const D3=(function(){
+  if(typeof THREE==='undefined')return null;
+  let rd;
+  try{rd=new THREE.WebGLRenderer({canvas:$('#diceCanvas'),alpha:true,antialias:true});}catch(e){return null;}
+  const W=400,H=130, R=.4, L=2.5;
+  rd.setPixelRatio(Math.min(2,window.devicePixelRatio||1)); rd.setSize(W,H,false);
+  const scene=new THREE.Scene(), cam=new THREE.PerspectiveCamera(27,W/H,.1,60);
+  cam.position.set(0,6.3,4.4); cam.lookAt(0,.2,0);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x4a7f8f,.85));
+  const sun=new THREE.DirectionalLight(0xffffff,.95); sun.position.set(3,7,4); scene.add(sun);
+  const UP=new THREE.Vector3(0,1,0), ZA=new THREE.Vector3(0,0,1), tmp=new THREE.Quaternion(), tmp2=new THREE.Quaternion();
+  /* ombra */
+  const sc=document.createElement('canvas'); sc.width=sc.height=64;
+  const sx=sc.getContext('2d'), gr=sx.createRadialGradient(32,32,2,32,32,30);
+  gr.addColorStop(0,'rgba(0,0,0,.5)'); gr.addColorStop(1,'rgba(0,0,0,0)'); sx.fillStyle=gr; sx.fillRect(0,0,64,64);
+  const shTex=new THREE.CanvasTexture(sc);
+  const mkShadow=(w,h)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:shTex,transparent:true,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=.01;scene.add(m);return m;};
+  /* legnetti: mezzo cilindro, parte piana bianca, parte convessa nera */
+  const shp=new THREE.Shape(); shp.moveTo(-R,0); shp.absarc(0,0,R,Math.PI,2*Math.PI,false); shp.lineTo(-R,0);
+  const sg=new THREE.ExtrudeGeometry(shp,{depth:L,bevelEnabled:false,curveSegments:22}); sg.translate(0,0,-L/2);
+  const mBlack=new THREE.MeshStandardMaterial({color:0x17181d,roughness:.45,metalness:.05}), mWhite=new THREE.MeshStandardMaterial({color:0xf6efd9,roughness:.5});
+  const sticks=[];
+  for(let i=0;i<4;i++){
+    const root=new THREE.Group(), body=new THREE.Group();
+    body.add(new THREE.Mesh(sg,mBlack));
+    const pn=new THREE.Mesh(new THREE.PlaneGeometry(2*R*.97,L*.995),mWhite); pn.rotation.x=-Math.PI/2; pn.position.y=.004; body.add(pn);
+    root.add(body); scene.add(root);
+    sticks.push({root,body,sh:mkShadow(1.6,3.4),axis:ZA,spin:0,qT:new THREE.Quaternion(),delay:0,up:true});
+  }
+  /* dado a sei facce: 1-5 segni, 6 = X */
+  function faceTex(v){
+    const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');
+    g.fillStyle='#2a93ad'; g.fillRect(0,0,128,128); g.strokeStyle='rgba(255,255,255,.25)'; g.lineWidth=5; g.strokeRect(6,6,116,116);
+    g.strokeStyle='#f6efd9'; g.lineWidth=9; g.lineCap='round';
+    if(v===6){g.beginPath();g.moveTo(34,34);g.lineTo(94,94);g.moveTo(94,34);g.lineTo(34,94);g.stroke();}
+    else for(let i=0;i<v;i++){const x=64+(i-(v-1)/2)*17;g.beginPath();g.moveTo(x,30);g.lineTo(x,98);g.stroke();}
+    return new THREE.CanvasTexture(c);
+  }
+  const NRM=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].map(a=>new THREE.Vector3(a[0],a[1],a[2]));
+  const dieMats=[1,2,3,4,5,6].map(v=>new THREE.MeshStandardMaterial({map:faceTex(v),roughness:.35,metalness:.05}));
+  const dieRoot=new THREE.Group(), dieBody=new THREE.Group(); const DS=1.5;
+  dieBody.add(new THREE.Mesh(new THREE.BoxGeometry(DS,DS,DS),dieMats));
+  dieBody.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(DS,DS,DS)),new THREE.LineBasicMaterial({color:0x0a2c3a})));
+  dieRoot.add(dieBody); scene.add(dieRoot);
+  const die={root:dieRoot,body:dieBody,sh:mkShadow(2.8,2.8),axis:new THREE.Vector3(),spin:0,qT:new THREE.Quaternion(),delay:0};
+  let mode='sticks';
+  const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function setup(faces){
+    const items=[];
+    if(mode==='sticks'){
+      sticks.forEach((d,i)=>{
+        const x=(i-1.5)*1.45, up=!!faces[i]; d.up=up;
+        d.root.visible=d.sh.visible=true; d.root.position.set(x,up?R:.02,0); d.sh.position.x=x; d.sh.scale.setScalar(1); d.sh.material.opacity=1;
+        d.qT.setFromAxisAngle(UP,(Math.random()-.5)*.5).multiply(tmp.setFromAxisAngle(ZA,up?0:Math.PI)); d.base=d.root.position.y; items.push(d);
+      });
+      die.root.visible=die.sh.visible=false;
+    } else {
+      sticks.forEach(d=>{d.root.visible=d.sh.visible=false;});
+      die.root.visible=die.sh.visible=true; die.root.position.set(0,DS/2,0); die.sh.position.x=0; die.base=DS/2; die.sh.scale.setScalar(1); die.sh.material.opacity=1;
+      die.qT.setFromAxisAngle(UP,Math.random()*Math.PI*2).multiply(tmp.setFromUnitVectors(NRM[faces[0]-1],UP)); items.push(die);
+    }
+    return items;
+  }
+  return {
+    mode(m){mode=m;},
+    rest(faces){const it=setup(faces); it.forEach(d=>d.body.quaternion.copy(d.qT)); rd.render(scene,cam);},
+    roll(faces,done){
+      const it=setup(faces);
+      if(still){it.forEach(d=>d.body.quaternion.copy(d.qT)); rd.render(scene,cam); setTimeout(done,200); return;}
+      it.forEach((d,i)=>{
+        d.axis=mode==='sticks'?ZA:new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize();
+        d.spin=(mode==='sticks'?(2+Math.floor(Math.random()*3)+.0):(2.5+Math.random()*2))*Math.PI*2; d.delay=i*80;
+      });
+      const t0=performance.now(), T=1300;
+      (function frame(now){
+        let all=true;
+        it.forEach(d=>{
+          const t=Math.min(1,Math.max(0,(now-t0-d.delay)/T)); if(t<1)all=false;
+          const e=1-Math.pow(1-t,3);
+          d.body.quaternion.copy(tmp2.setFromAxisAngle(d.axis,d.spin*(1-e))).multiply(d.qT);
+          const hop=Math.abs(Math.sin(t*Math.PI*3))*Math.pow(1-t,1.3)*1.2;
+          d.root.position.y=d.base+hop; d.sh.scale.setScalar(1-hop*.2); d.sh.material.opacity=1-hop*.45;
+        });
+        rd.render(scene,cam);
+        if(all)done(); else requestAnimationFrame(frame);
+      })(performance.now());
+    }
+  };
+})();
+if(D3)$('#dice').hidden=true; else $('#diceCanvas').hidden=true, $('#dice').hidden=false;
+function showDice(faces,idle){if(D3)D3.rest(faces);else setDice(faces,idle?'idle':'');}
+function rollVisual(th,done){
+  if(D3){D3.roll(th.faces,done);return;}
+  const g=gen; let k=0;
+  const iv=setInterval(()=>{
+    if(g!==gen){clearInterval(iv);return;}
+    const r=rollThrow(st,Math.random); setDice(r.faces,'rolling');
+    if(++k>=7){clearInterval(iv);setDice(th.faces,'');done();}
+  },90);
+}
+const restFaces=()=>st.rules==='kendall'?[true,false,true,false]:[1];
+
+function pushLog(ev){
+  const ol=$('#log');
+  ev.forEach(e=>{
+    const li=document.createElement('li');
+    li.innerHTML='<span class="dot '+(e.p==null?'n':'p'+e.p)+'"></span><span></span>';
+    li.lastChild.textContent=e.msg; if(e.p==null)li.className='sys';
+    ol.insertBefore(li,ol.firstChild);
+  });
+  while(ol.children.length>80)ol.removeChild(ol.lastChild);
+}
+
+/* ===== stato -> DOM, con animazione dei passi ===== */
+const SLOTS={}, animating=new Set();
+function layoutMap(){
+  const used=[new Set(),new Set()], m={};
+  st.pieces.forEach(pc=>{
+    if(pc.pos===OUT&&SLOTS[pc.id]!==undefined)used[pc.owner].add(SLOTS[pc.id]); else if(pc.pos!==OUT)delete SLOTS[pc.id];
+  });
+  st.pieces.forEach(pc=>{
+    if(pc.pos!==OUT||SLOTS[pc.id]!==undefined)return;
+    let i=0; while(used[pc.owner].has(i))i++; used[pc.owner].add(i); SLOTS[pc.id]=i;
+  });
+  st.pieces.forEach(pc=>{
+    if(pc.pos===OUT){const q=slot(pc.owner,SLOTS[pc.id]);m[pc.id]={x:q.x,y:q.y,s:SC};}
+    else{const q=sqXY(pc.pos);m[pc.id]={x:q.x,y:q.y,s:1};}
+  });
+  return m;
+}
+function freeIdx(p){
+  const u=new Set(); st.pieces.forEach(pc=>{if(pc.owner===p&&pc.pos===OUT&&SLOTS[pc.id]!==undefined)u.add(SLOTS[pc.id]);});
+  let i=0; while(u.has(i))i++; return i;
+}
+const setT=(el,q,k)=>{el.style.transform='translate('+q.x+'px,'+q.y+'px) scale('+(q.s*(k||1))+')';};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const snapshot=()=>st.pieces.map(p=>p.pos);
+const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function curXY(el){const m=/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(el.style.transform||'');return m?{x:+m[1],y:+m[2]}:{x:0,y:0};}
+function wpts(pc,from,to,fx,v){
+  const a=[];
+  if(to===OUT){for(let s=from+1;s<=30;s++)a.push(s);a.push('X');return a;}
+  if(fx&&fx.via&&fx.mover===pc.id){for(let s=from+1;s<=fx.via;s++)a.push(s);a.push('F');return a;}
+  if(to>from){ if(from===26&&to===28&&v===1&&fx&&fx.mover===pc.id)return [28]; for(let s=from+1;s<=to;s++)a.push(s); return a; }
+  for(let s=from-1;s>=to;s--)a.push(s);
+  return a;
+}
+async function animateChanges(snap){
+  const g=gen, LM=layoutMap(), fx=st.fx||{}, v=st.roll?st.roll.v:0;
+  const ch=st.pieces.filter(pc=>snap[pc.id]!==pc.pos);
+  if(!ch.length)return;
+  ch.sort((a,b)=>(b.id===fx.mover?1:0)-(a.id===fx.mover?1:0));
+  ch.forEach(pc=>animating.add(pc.id));
+  for(const pc of ch){
+    const el=els[pc.id]; pl.appendChild(el);
+    const isM=pc.id===fx.mover, from=snap[pc.id];
+    if(calm){setT(el,LM[pc.id]);}
+    else{
+      const pts=wpts(pc,from,pc.pos,fx,v); let prev=curXY(el);
+      for(let k=0;k<pts.length;k++){
+        const w=pts[k]; let q;
+        if(w==='X'||w==='F'){q=LM[pc.id];}
+        else{const z=sqXY(w);q={x:z.x,y:z.y,s:1};}
+        if(w==='X'||w==='F'){ el.style.transition=''; setT(el,q); await wait(540); if(g!==gen)return; break; }
+        const dist=Math.hypot(q.x-prev.x,q.y-prev.y), d1=Math.round(Math.max(80,Math.min(190,50+dist/9))), d2=60;
+        el.style.transition='transform '+d1+'ms ease-out'; setT(el,q,isM?1.25:1.08);
+        await wait(d1+4); if(g!==gen)return;
+        el.style.transition='transform '+d2+'ms ease-in'; setT(el,q,1); if(isM)AU.step(k);
+        await wait(d2+6); if(g!==gen)return;
+        prev=q;
+      }
+      el.style.transition=''; setT(el,LM[pc.id]);
+    }
+    if(isM){
+      if(pc.pos===OUT)AU.exit();
+      else if(fx.via===27)AU.bad();
+      else if(ch.length>1)AU.swap();
+      else if(from>pc.pos)AU.back();
+      else if(SAFE.includes(pc.pos))AU.safe();
+      else AU.land();
+    }
+  }
+  ch.forEach(pc=>animating.delete(pc.id));
+  render();
+}
+
+function render(){
+  const LM=layoutMap();
+  st.pieces.forEach(pc=>{
+    const el=els[pc.id]||mkPiece(pc);
+    if(!animating.has(pc.id))setT(el,LM[pc.id]);
+  });
+  const human=st.phase==='move'&&!busy&&!isCpu(st.turn);
+  const mv=st.phase==='move'?st.moves:[];
+  st.pieces.forEach(pc=>{
+    const el=els[pc.id];
+    const idx=mv.length?moveFor(pc):-1;
+    const can=human&&idx>=0;
+    el.classList.toggle('movable',can);
+    el.classList.toggle('onb',pc.pos>=1&&pc.pos<=30);
+    el.classList.toggle('selected',idx>=0&&selected===idx&&st.phase==='move');
+    el.classList.toggle('stuck',stuckPiece(st,pc.owner)===pc);
+    if(can){el.setAttribute('tabindex','0');el.setAttribute('role','button');el.setAttribute('aria-label',moveLabel(mv[idx]));}
+    else{el.removeAttribute('tabindex');el.removeAttribute('role');el.removeAttribute('aria-label');}
+  });
+  gl.innerHTML='';
+  if(st.phase==='move'&&!busy){
+    const p=st.turn;
+    mv.forEach((m,i)=>{
+      if(isCpu(p)&&selected!==i)return;
+      let x,y,r=400;
+      if(m.kind==='exit'){const q=slot(p,freeIdx(p));x=q.x;y=q.y;r=400*SC;}
+      else{const c=sqXY(m.to);x=c.x;y=c.y;}
+      const c=document.createElementNS(NS,'circle');
+      c.setAttribute('class','ghost p'+p+(selected===i?' sel':'')+(m.cap!=null?' cap':'')+(m.kind==='exit'?' off':'')+(m.kind==='back'?' back':''));
+      c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',r);c.dataset.idx=i;
+      gl.appendChild(c);
+    });
+  }
+  panels();
+}
+function moveFor(pc){
+  if(st.phase!=='move'||pc.owner!==st.turn)return -1;
+  const ok=st.moves.findIndex(m=>m.id===pc.id&&m.kind!=='jump'); return ok>=0?ok:st.moves.findIndex(m=>m.id===pc.id);
+}
+function moveLabel(m){
+  if(m.kind==='exit')return 'Porta fuori la pedina in casella '+m.from;
+  if(m.kind==='back')return 'Pedina in casella '+m.from+', retrocedi alla '+m.to;
+  if(m.kind==='jump')return 'Pedina in casella '+m.from+', salta la malasorte e vai alla '+m.to;
+  return 'Pedina in casella '+m.from+', muovi alla '+m.to+(m.cap!=null?' e attacca':'');
+}
+
+function panels(){
+  for(let p=0;p<2;p++){
+    const out=st.pieces.filter(x=>x.owner===p&&x.pos===OUT).length, inp=st.n-out;
+    let m='';for(let i=0;i<st.n;i++)m+='<i class="'+(i<out?'on':'')+'"></i>';
+    const el=$('#pc'+p), sp=stuckPiece(st,p);
+    el.className='pcard'+(st.turn===p&&st.phase!=='over'?' active':'');
+    el.innerHTML='<span class="sw p'+p+'"></span><div class="pname">'+NAMES[p]+'<span class="tag">'+(p===1&&cpuOn?'computer':'giocatore')+'</span></div>'
+      +'<div class="meter" aria-hidden="true">'+m+'</div>'
+      +'<div class="meta">Nell\'aldilà '+out+'/'+st.n+' · in gioco '+inp+(sp?' · bloccato in 27':'')+'</div>';
+  }
+  const over=st.phase==='over';
+  $('#againBtn').hidden=!over;
+  const human=!isCpu(st.turn)&&!busy&&!rolling;
+  const canRoll=st.phase==='roll'&&human;
+  const rb=$('#rollBtn'); rb.hidden=over; rb.disabled=!canRoll;
+  const dev=st.rules==='kendall'?'i legnetti':'il dado';
+  rb.textContent=st.again?'Tira ancora':'Tira '+dev;
+  const fe=!over&&canRoll&&freeExit(st)!=null; $('#exitBtn').hidden=!fe;
+  $('#status').innerHTML=statusHTML();
+}
+function statusHTML(){
+  const p=st.turn, N='<b>'+NAMES[p]+'</b>', dev=st.rules==='kendall'?'i legnetti':'il dado';
+  if(st.phase==='over')return '<b>'+NAMES[st.winner]+' vince.</b> Ha portato nell\'aldilà tutte le '+st.n+' pedine.';
+  if(rolling)return 'Lancio…';
+  if(note)return note;
+  if(st.phase==='move'){
+    const d=describeRoll(st,st.roll.v);
+    if(isCpu(p))return N+' (computer) sceglie la mossa. '+d.head+'.';
+    if(selected!=null){const m=st.moves[selected];return d.head+'. '+moveLabel(m)+'. Tocca di nuovo la pedina o la casella tratteggiata per confermare.';}
+    const back=st.moves.every(m=>m.kind==='back');
+    return d.head+'. '+(back?'Nessuna pedina può avanzare: ne retrocede una. ':d.text+' ')+'Tocca una pedina evidenziata.'+(st.moves.some(m=>m.kind==='jump')?' Dalla 26 puoi toccare la casella 28 per saltare la malasorte.':'');
+  }
+  if(isCpu(p))return N+' (computer) lancia…';
+  if(stuckPiece(st,p))return N+' è bloccato in casa 27: serve un 4. Lancia.';
+  return (st.again?N+' ha diritto a un altro lancio.':'Tocca a '+N+'.')+' Lancia '+dev+'.'+(freeExit(st)!=null?' Puoi anche portare fuori la pedina in 30.':'');
+}
+
+/* flusso */
+function later(fn,ms){const g=gen;setTimeout(()=>{if(g===gen)fn();},ms);}
+function next(){
+  note=''; render();
+  if(st.phase==='over')return;
+  if(isCpu(st.turn))later(cpuTurn,900);
+}
+function cpuTurn(){
+  if(freeExit(st)!=null)doFreeExit(); else doRoll();
+}
+async function doFreeExit(){
+  if(busy||rolling||freeExit(st)==null)return;
+  AU.click(); busy=true; const g=gen, snap=snapshot();
+  const ev=applyFreeExit(st); pushLog(ev);
+  const pr=animateChanges(snap); render();
+  await pr; if(g!==gen)return;
+  if(st.phase==='over'){AU.win(); busy=false; render(); return;}
+  await wait(300); if(g!==gen)return;
+  busy=false; render();
+  if(isCpu(st.turn))later(doRoll,700);
+}
+function doRoll(){
+  if(busy||rolling||st.phase!=='roll')return;
+  selected=null; rolling=true; note=''; render(); $('#big').textContent='…';
+  AU.dice();
+  const th=rollThrow(st,Math.random), g=gen;
+  rollVisual(th,async()=>{
+    if(g!==gen)return;
+    rolling=false;
+    const snap=snapshot(), info=applyRoll(st,th);
+    const d=describeRoll(st,th.v);
+    $('#big').textContent=th.v===0?'X':th.v; $('#capt').textContent=d.head.split(':')[0].toLowerCase();
+    const hs=d.head.replace(': ',' → ').replace(/^./,c=>c.toLowerCase());
+    pushLog([{p:info.p,msg:NAMES[info.p]+' tira: '+hs+'.'}].concat(info.ev));
+    if(info.status==='move'){
+      busy=false; render();
+      if(isCpu(st.turn))later(cpuMove,1000);
+    } else {
+      busy=true; AU.pass();
+      note=d.head+'. '+(th.v===0?'Il turno passa.':'Nessuna mossa possibile: il turno passa.');
+      render(); await wait(1500); if(g!==gen)return;
+      busy=false; next();
+    }
+  });
+}
+function cpuMove(){
+  if(st.phase!=='move')return;
+  selected=cpuChoose(st,Math.random); render();
+  later(()=>confirm(selected),800);
+}
+async function confirm(i){
+  const m=st.moves[i]; if(!m||st.phase!=='move')return;
+  busy=true; selected=null; const g=gen, snap=snapshot();
+  const ev=applyMove(st,m); pushLog(ev);
+  const pr=animateChanges(snap); render();
+  await pr; if(g!==gen)return;
+  if(st.phase==='over'){AU.win(); busy=false; render(); return;}
+  await wait(280); if(g!==gen)return;
+  busy=false; next();
+}
+function activate(t){
+  if(busy||rolling||st.phase!=='move'||isCpu(st.turn))return;
+  AU.click();
+  const pe=t.closest&&t.closest('.piece.movable'), ge=t.closest&&t.closest('.ghost');
+  if(pe){const i=moveFor(st.pieces[+pe.dataset.id]); if(i<0)return; if(selected===i)confirm(i); else{selected=i;render();}}
+  else if(ge){const i=+ge.dataset.idx; if(selected===i)confirm(i); else{selected=i;render();}}
+  else if(selected!=null){selected=null;render();}
+}
+svg.addEventListener('click',e=>activate(e.target));
+svg.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('piece')){e.preventDefault();activate(e.target);}});
+$('#rollBtn').addEventListener('click',doRoll);
+$('#exitBtn').addEventListener('click',doFreeExit);
+
+/* nuova partita */
+function startGame(){
+  gen++; busy=false; rolling=false; selected=null; note='';
+  const f=$('#opts'), rules=f.rules.value, n=+f.npc.value;
+  cpuOn=f.opp.value==='cpu';
+  const tmp={rules}; let first, msg;
+  if(rules==='kendall'){
+    let p=0,vals=[],v; do{v=rollThrow(tmp,Math.random).v; vals.push(NAMES[p]+' '+v); if(v===1)break; p=1-p;}while(vals.length<60);
+    first=v===1?p:0; msg='Tiri d\'apertura (si lancia a turno finché uno ottiene 1): '+vals.join(', ')+'. Comincia '+NAMES[first]+', sulle caselle pari.';
+  } else {
+    let a,b; do{a=rollThrow(tmp,Math.random).v;b=rollThrow(tmp,Math.random).v;}while(a===b);
+    first=a>b?0:1; const L=x=>x===0?'X':x; msg='Tiro d\'apertura: '+NAMES[0]+' '+L(a)+', '+NAMES[1]+' '+L(b)+' (la X vale meno di tutti). Comincia '+NAMES[first]+', sulle caselle pari: la prima mossa spetta alla pedina in casella 10.';
+  }
+  st=newState({rules,n,first});
+  animating.clear(); Object.keys(SLOTS).forEach(k=>delete SLOTS[k]);
+  Object.keys(els).forEach(k=>{els[k].remove();delete els[k];});
+  $('#log').innerHTML=''; pushLog([{msg}]);
+  if(D3)D3.mode(rules==='kendall'?'sticks':'die');
+  document.querySelectorAll('#frame .tslot').forEach(c=>{c.style.display=+c.dataset.i>=n?'none':'';});
+  showDice(restFaces(),true); $('#big').textContent='–'; $('#capt').textContent='in attesa del primo lancio';
+  next();
+}
+$('#opts').addEventListener('submit',e=>{e.preventDefault();startGame();});
+$('#newBtn').addEventListener('click',startGame);
+$('#againBtn').addEventListener('click',startGame);
+function syncOpts(){}
+$('#opts').addEventListener('change',e=>{if(e.target.name==='rules'){$('#opts').npc.value=e.target.value==='kendall'?'7':'5';}});
+$('#optNums').addEventListener('change',e=>svg.classList.toggle('hide-nums',!e.target.checked));
+/* ===== Audio ===== */
+const AU=(function(){
+  let ctx=null,master,sfxG,musG,verb,noiseBuf;
+  const S={sfx:true,mus:false};
+  try{const v=localStorage.getItem('senet-audio'); if(v){const o=JSON.parse(v); S.sfx=o.sfx!==false; S.mus=!!o.mus;}}catch(e){}
+  const save=()=>{try{localStorage.setItem('senet-audio',JSON.stringify(S));}catch(e){}};
+  function init(){
+    if(ctx)return true;
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return false;
+    try{ctx=new AC();}catch(e){return false;}
+    master=ctx.createGain(); master.gain.value=.9; master.connect(ctx.destination);
+    sfxG=ctx.createGain(); sfxG.gain.value=.6; sfxG.connect(master);
+    musG=ctx.createGain(); musG.gain.value=0; musG.connect(master);
+    const len=Math.floor(ctx.sampleRate*2.4), ir=ctx.createBuffer(2,len,ctx.sampleRate);
+    for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6);}
+    verb=ctx.createConvolver(); verb.buffer=ir; const vg=ctx.createGain(); vg.gain.value=.55; verb.connect(vg); vg.connect(musG);
+    noiseBuf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate); const nd=noiseBuf.getChannelData(0); for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+    return true;
+  }
+  const ok=()=>S.sfx&&ctx&&ctx.state==='running';
+  function tone(f,t,d,o){
+    o=o||{}; const os=ctx.createOscillator(), e=ctx.createGain();
+    os.type=o.type||'sine'; os.frequency.setValueAtTime(f,t); if(o.to)os.frequency.exponentialRampToValueAtTime(o.to,t+d);
+    e.gain.setValueAtTime(.0001,t); e.gain.exponentialRampToValueAtTime(o.g||.3,t+.008); e.gain.exponentialRampToValueAtTime(.0001,t+d);
+    os.connect(e); e.connect(sfxG); os.start(t); os.stop(t+d+.03);
+  }
+  function noise(t,d,f,g,q,type){
+    const s=ctx.createBufferSource(); s.buffer=noiseBuf; s.loop=true;
+    const bp=ctx.createBiquadFilter(); bp.type=type||'bandpass'; bp.frequency.value=f; bp.Q.value=q||1;
+    const e=ctx.createGain(); e.gain.setValueAtTime(g,t); e.gain.exponentialRampToValueAtTime(.0001,t+d);
+    s.connect(bp); bp.connect(e); e.connect(sfxG); s.start(t,Math.random()*.5); s.stop(t+d+.03);
+  }
+  const now=()=>ctx.currentTime+.01;
+  const fx={
+    dice(){const t=now();for(let k=0;k<9;k++){const tt=t+k*.11+Math.random()*.04;noise(tt,.045,900+Math.random()*900,Math.max(.12,.6-k*.05),3);tone(260+Math.random()*180,tt,.05,{type:'triangle',to:150,g:.1});}},
+    step(k){const t=now();tone(300+(k%6)*18,t,.07,{type:'triangle',g:.13});noise(t,.03,2200,.07,1);},
+    land(){const t=now();tone(140,t,.16,{to:75,g:.36});noise(t,.06,450,.28,1,'lowpass');},
+    safe(){const t=now();[587,880,1175].forEach((f,i)=>{tone(f,t+i*.08,.8,{g:.15});tone(f*2.01,t+i*.08,.4,{g:.035});});},
+    swap(){const t=now();noise(t,.22,1300,.45,.7);tone(260,t,.18,{type:'sawtooth',to:520,g:.1});tone(520,t+.14,.2,{type:'sawtooth',to:260,g:.1});tone(150,t,.16,{to:70,g:.3});},
+    back(){const t=now();tone(420,t,.22,{type:'triangle',to:240,g:.14});},
+    bad(){const t=now();[392,330,277,220,165].forEach((f,i)=>tone(f,t+i*.11,.4,{type:'sawtooth',g:.09}));noise(t+.1,.5,500,.25,.8,'lowpass');},
+    exit(){const t=now();[523,659,784,1047,1319].forEach((f,i)=>tone(f,t+i*.09,.55,{type:'triangle',g:.17}));},
+    win(){const t=now();[294,370,440,587,740,880].forEach((f,i)=>{tone(f,t+i*.15,1.6,{type:'triangle',g:.17});tone(f*2,t+i*.15,.8,{g:.05});});tone(147,t,2.2,{type:'sawtooth',g:.07});},
+    pass(){const t=now();tone(230,t,.4,{type:'triangle',to:150,g:.15});},
+    click(){const t=now();tone(720,t,.04,{type:'square',g:.04});}
+  };
+  const api={S,
+    unlock(){if(!init())return; if(ctx.state==='suspended')ctx.resume().then(()=>{if(S.mus)Music.start();}); else if(S.mus)Music.start();},
+    setSfx(v){S.sfx=v;save();if(v)api.unlock();},
+    setMus(v){S.mus=v;save();if(v){if(init()){ctx.resume();Music.start();}}else Music.stop();},
+    ctx:()=>ctx,mus:()=>musG,verb:()=>verb,noise:()=>noiseBuf,init};
+  Object.keys(fx).forEach(k=>{api[k]=function(){if(ok())try{fx[k].apply(null,arguments);}catch(e){}};});
+  return api;
+})();
+
+/* colonna sonora procedurale: bordone, arpa pizzicata, flauto (nay), tamburo darbuka, sistro. Scala doppia armonica su re */
+const Music=(function(){
+  let on=false,timer=null,nextT=0,step=0,bar=0,deg=3,drone=null,cache={},phrase=[];
+  const BPM=76,B=60/BPM,D=146.83;
+  const SCL=[0,1,4,5,7,8,11,12,13,16,17,19,20,23];
+  const fr=n=>D*Math.pow(2,n/12);
+  function pluckBuf(ctx,freq){
+    const key=Math.round(freq); if(cache[key])return cache[key];
+    const sr=ctx.sampleRate,len=Math.floor(sr*2.8),buf=ctx.createBuffer(1,len,sr),d=buf.getChannelData(0),N=Math.max(2,Math.round(sr/freq));
+    const ring=new Float32Array(N); for(let i=0;i<N;i++)ring[i]=(Math.random()*2-1)*(1-i/N*.3);
+    let p=0,prev=0,mx=0;
+    for(let i=0;i<len;i++){const c=ring[p];d[i]=c;ring[p]=(c+prev)*.5*.9985;prev=c;p=(p+1)%N;if(Math.abs(c)>mx)mx=Math.abs(c);}
+    for(let i=0;i<len;i++)d[i]/=mx||1;
+    return cache[key]=buf;
+  }
+  function harp(freq,t,g){
+    const ctx=AU.ctx(),s=ctx.createBufferSource(); s.buffer=pluckBuf(ctx,freq);
+    const e=ctx.createGain(); e.gain.value=g; const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200;
+    s.connect(lp); lp.connect(e); e.connect(AU.mus()); const w=ctx.createGain(); w.gain.value=.55; e.connect(w); w.connect(AU.verb()); s.start(t);
+  }
+  function drum(t,kind){
+    const ctx=AU.ctx();
+    if(kind==='D'){
+      const o=ctx.createOscillator(),e=ctx.createGain(); o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(70,t+.16);
+      e.gain.setValueAtTime(.0001,t); e.gain.exponentialRampToValueAtTime(.5,t+.008); e.gain.exponentialRampToValueAtTime(.0001,t+.28);
+      o.connect(e); e.connect(AU.mus()); o.start(t); o.stop(t+.32);
+    } else {
+      const s=ctx.createBufferSource(); s.buffer=AU.noise(); s.loop=true; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=kind==='T'?3000:2200; bp.Q.value=1.6;
+      const e=ctx.createGain(); e.gain.setValueAtTime(kind==='T'?.2:.1,t); e.gain.exponentialRampToValueAtTime(.0001,t+.07);
+      s.connect(bp); bp.connect(e); e.connect(AU.mus()); s.start(t,Math.random()*.4); s.stop(t+.1);
+    }
+  }
+  function sistrum(t){
+    const ctx=AU.ctx();
+    for(let k=0;k<4;k++){
+      const tt=t+k*.035, s=ctx.createBufferSource(); s.buffer=AU.noise(); s.loop=true; const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=6500;
+      const e=ctx.createGain(); e.gain.setValueAtTime(.05-k*.008,tt); e.gain.exponentialRampToValueAtTime(.0001,tt+.05);
+      s.connect(hp); hp.connect(e); e.connect(AU.mus()); s.start(tt,Math.random()*.4); s.stop(tt+.07);
+    }
+  }
+  function flute(freq,t,d){
+    const ctx=AU.ctx(),o=ctx.createOscillator(),o2=ctx.createOscillator(),lfo=ctx.createOscillator(),lg=ctx.createGain(),e=ctx.createGain(),lp=ctx.createBiquadFilter();
+    o.type='sine'; o2.type='triangle'; o.frequency.value=freq; o2.frequency.value=freq*2.003; lfo.frequency.value=5.2; lg.gain.value=freq*.009;
+    lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency); lp.type='lowpass'; lp.frequency.value=2400;
+    e.gain.setValueAtTime(.0001,t); e.gain.exponentialRampToValueAtTime(.11,t+Math.min(.12,d*.3)); e.gain.setTargetAtTime(.0001,t+d*.75,d*.12);
+    const m2=ctx.createGain(); m2.gain.value=.18; o2.connect(m2); o.connect(lp); m2.connect(lp);
+    const s=ctx.createBufferSource(); s.buffer=AU.noise(); s.loop=true; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=freq*3; bp.Q.value=2;
+    const ne=ctx.createGain(); ne.gain.setValueAtTime(.025,t); ne.gain.exponentialRampToValueAtTime(.0001,t+d); s.connect(bp); bp.connect(ne); ne.connect(lp); s.start(t,Math.random()*.4); s.stop(t+d+.05);
+    lp.connect(e); e.connect(AU.mus()); const w=ctx.createGain(); w.gain.value=.8; e.connect(w); w.connect(AU.verb());
+    [o,o2,lfo].forEach(x=>{x.start(t);x.stop(t+d+.1);});
+  }
+  function startDrone(){
+    const ctx=AU.ctx(),g=ctx.createGain(); g.gain.value=.075; const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=380;
+    const lfo=ctx.createOscillator(),lg=ctx.createGain(); lfo.frequency.value=.06; lg.gain.value=140; lfo.connect(lg); lg.connect(lp.frequency);
+    const oscs=[[D/2,'sawtooth'],[D*.75,'sawtooth'],[D/2*1.005,'triangle'],[D,'triangle']].map(a=>{const o=ctx.createOscillator();o.type=a[1];o.frequency.value=a[0];o.connect(lp);o.start();return o;});
+    lfo.start(); lp.connect(g); g.connect(AU.mus()); const w=ctx.createGain(); w.gain.value=.6; g.connect(w); w.connect(AU.verb());
+    return {stop(){oscs.forEach(o=>{try{o.stop();}catch(e){}});try{lfo.stop();}catch(e){}}};
+  }
+  const RH=['D','T','','T','D','','T','K'];
+  function newPhrase(){
+    const len=4+Math.floor(Math.random()*3); let d=Math.floor(Math.random()*SCL.length), out=[];
+    for(let i=0;i<len;i++){d=Math.max(2,Math.min(SCL.length-1,d+(Math.random()<.5?-1:1)*(1+Math.floor(Math.random()*2))));out.push({n:SCL[d]+12,b:[1,1,2,3][Math.floor(Math.random()*4)]});}
+    out[len-1].n=[12,19,24][Math.floor(Math.random()*3)]; out[len-1].b=4; return out;
+  }
+  function sched(t,s){
+    const r=RH[s]; if(r)drum(t,r);
+    if(s%2===1&&bar%2===0)sistrum(t);
+    if((s===0||s===3||s===4||s===6)&&Math.random()<.78){
+      const rr=Math.random(); const dd=rr<.55?(Math.random()<.5?-1:1):(rr<.9?(Math.random()<.5?-2:2):(Math.random()<.5?-3:3));
+      deg=Math.max(0,Math.min(SCL.length-2,deg+dd)); harp(fr(SCL[deg]),t,.5+Math.random()*.25);
+      if(s===0&&Math.random()<.4)harp(fr(SCL[deg])*2,t+B*.25,.22);
+    }
+    if(s===0&&bar%4===1){phrase=newPhrase();}
+    if(bar%4===2&&phrase.length&&s===0){let tt=t; phrase.forEach(p=>{flute(fr(p.n),tt,p.b*B*.5*.92);tt+=p.b*B*.5;});}
+  }
+  function tick(){
+    const ctx=AU.ctx(); if(!ctx||!on)return;
+    while(nextT<ctx.currentTime+.7){sched(nextT,step);nextT+=B/2;step=(step+1)%8;if(step===0)bar++;}
+  }
+  return {
+    start(){
+      const ctx=AU.ctx(); if(!ctx||on)return; on=true;
+      drone=startDrone(); nextT=ctx.currentTime+.2; step=0; bar=0; phrase=[];
+      AU.mus().gain.cancelScheduledValues(ctx.currentTime); AU.mus().gain.setTargetAtTime(.55,ctx.currentTime,.9);
+      timer=setInterval(tick,120); tick();
+    },
+    stop(){
+      const ctx=AU.ctx(); if(!ctx||!on)return; on=false; clearInterval(timer);
+      AU.mus().gain.cancelScheduledValues(ctx.currentTime); AU.mus().gain.setTargetAtTime(0,ctx.currentTime,.35);
+      const d=drone; drone=null; setTimeout(()=>{if(d)d.stop();},1800);
+    },
+    isOn:()=>on
+  };
+})();
+$('#optSfx').checked=AU.S.sfx; $('#optMusic').checked=AU.S.mus;
+$('#optSfx').addEventListener('change',e=>AU.setSfx(e.target.checked));
+$('#optMusic').addEventListener('change',e=>{AU.setMus(e.target.checked);syncStMus();});
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>AU.unlock(),{passive:true}));
+
+/* ===== Storia ===== */
+const STORY=[
+ {t:'Senet',b:'Il gioco del passaggio',art:'ankh'},
+ {k:'Antico Egitto',b:'Il senet è uno dei giochi più antichi di cui si abbia notizia. Alcuni lo considerano un antenato del backgammon.'},
+ {k:'Nelle tombe',b:'La sua storia è raccontata dai reperti ritrovati nelle tombe del Medio e del Nuovo Regno: tavole, pedine, immagini di giocatori.',art:'board'},
+ {k:'Il nome',b:'Senet significa «passaggio». Il gioco era una sfida, ma portava con sé un significato religioso: il passaggio dalla vita terrena all\'aldilà.',art:'eye'},
+ {k:'I faraoni',b:'All\'inizio lo giocava soltanto la classe più alta, quella dei faraoni.'},
+ {k:'Intorno al 1500 a.C.',b:'Il senet diventa un gioco per tutti. E assume un nuovo significato: si comincia a credere che la sorte dopo la morte dipenda da una partita.',art:'sun'},
+ {k:'Il defunto e il Destino',b:'Una partita giocata dal defunto contro il Destino in persona. È il motivo per cui le tombe sono piene di giochi, immagini e spiegazioni di partite.'},
+ {k:'Tutankhamon',b:'Nella sua tomba sono stati ritrovati tavoli da gioco in legno e avorio, con i cassetti per le pedine sotto la tavola.',art:'board'},
+ {k:'Geroglifici',b:'Figure di giocatori di senet compaiono anche nei geroglifici che raccontano la vita quotidiana e il passaggio dalla vita alla morte.'},
+ {k:'I legnetti',b:'Si lanciavano quattro legnetti a mezzo cilindro: convessi e neri da un lato, piani e bianchi dall\'altro. Il punteggio era il numero di facce bianche.',art:'sticks'},
+ {k:'Il viaggio',b:'Trenta caselle in tre file. Le ultime cinque hanno un significato speciale: la rinascita, l\'abbondanza, la malasorte, le tre verità, Horus, Ra.',art:'water'},
+ {k:'Regole perdute',b:'Nessuna copia integrale delle regole è arrivata fino a noi. Studiosi come Timothy Kendall e R.C. Bell le hanno ricostruite: oggi esistono molte varianti.'},
+ {k:'Fino alla fine',b:'In epoca antica forse entrambi i giocatori dovevano concludere la partita. Chi era uscito per primo non abbandonava l\'altro: lo assisteva fino alla meta.'},
+ {k:'Nella cultura di massa',b:'Il senet compare nel videogioco «Egypt 1156 a.C.: l\'enigma della tomba reale» (Cryo Interactive, 1997), in «Tomb Raider: The Last Revelation» (1999) e nella serie «Lost», come passatempo del giovane Jacob e di suo fratello.'},
+ {t:'Tocca a te',b:'Trenta caselle, cinque o sette pedine. Porta tutto nell\'aldilà.',art:'ankh'},
+ {k:'Fonti',b:'Voce «Senet», Wikipedia, e regole di Timothy Kendall e R.C. Bell nell\'adattamento UniNerd.',small:true}
+];
+function artSVG(a){
+  const gold='#c9a860';
+  const gl=(inner,vb)=>'<svg viewBox="'+(vb||'-450 -450 900 900')+'" aria-hidden="true" fill="none" stroke="'+gold+'" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 22px rgba(214,170,90,.4))">'+inner+'</svg>';
+  if(a==='ankh')return gl(GL[15]());
+  if(a==='eye')return gl(GL[29]());
+  if(a==='water')return gl(GL[27]());
+  if(a==='sun')return gl(GL[30]());
+  if(a==='board'){
+    let r='';for(let rr=0;rr<3;rr++)for(let c=0;c<10;c++)r+='<rect x="'+(c*110)+'" y="'+(rr*110)+'" width="100" height="100" rx="8" fill="'+((rr*10+c+1===15||(rr*10+c+1)>=26)?'rgba(201,168,96,.25)':'none')+'" stroke="'+gold+'" stroke-width="5"/>';
+    return '<svg viewBox="-10 -10 1120 350" aria-hidden="true">'+r+'</svg>';
+  }
+  if(a==='sticks'){
+    let r='';[0,1,2,3].forEach(i=>{r+='<rect x="'+(20+i*70)+'" y="20" width="44" height="190" rx="22" fill="'+(i%2?'#1a1a1f':'#f2e8c9')+'" stroke="'+gold+'" stroke-width="5"/>';});
+    return '<svg viewBox="0 0 320 230" aria-hidden="true">'+r+'</svg>';
+  }
+  return '';
+}
+const Story=(function(){
+  const el=$('#story'),card=$('#stCard'),cv=$('#stCv'),cx=cv.getContext('2d');
+  const FI=1600,FO=1400,dur=c=>5200+c.b.length*50;
+  const total=STORY.reduce((a,c)=>a+dur(c),0);
+  let i=0,tt=0,paused=false,running=false,last=0,raf=0,parts=[],opener=null;
+  const sm=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
+  function show(n){
+    i=n;tt=0; const c=STORY[i];
+    $('#stArt').innerHTML=c.art?artSVG(c.art):''; $('#stKick').textContent=c.k||''; $('#stTitle').textContent=c.t||''; $('#stBody').textContent=c.b||'';
+    card.classList.toggle('small',!!c.small); card.style.opacity='0'; $('#stEnd').classList.remove('on');
+  }
+  function resize(){const r=window.devicePixelRatio||1;cv.width=innerWidth*r;cv.height=innerHeight*r;cx.setTransform(r,0,0,r,0,0);}
+  function mkParts(){parts=Array.from({length:calm?0:90},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:.6+Math.random()*1.8,v:6+Math.random()*16,a:.15+Math.random()*.4,p:Math.random()*6.28}));}
+  function frame(now){
+    if(!running)return; raf=requestAnimationFrame(frame);
+    const dt=Math.min(60,now-last); last=now;
+    cx.clearRect(0,0,innerWidth,innerHeight);
+    parts.forEach(p=>{p.x+=p.v*dt/1000; p.y+=Math.sin(now/2600+p.p)*.12; if(p.x>innerWidth+5){p.x=-5;p.y=Math.random()*innerHeight;}
+      cx.globalAlpha=p.a*(.6+.4*Math.sin(now/1700+p.p)); cx.fillStyle='#e6c98a'; cx.beginPath(); cx.arc(p.x,p.y,p.r,0,6.283); cx.fill();});
+    if(!paused&&i<STORY.length){
+      tt+=dt; const D=dur(STORY[i]);
+      if(tt>=D){ if(i<STORY.length-1)show(i+1); else{ end(); } }
+    }
+    if(i<STORY.length&&!$('#stEnd').classList.contains('on')){
+      const D=dur(STORY[i]), a=sm(tt/FI), b=sm((D-tt)/FO), op=Math.min(a,b), pr=tt/D;
+      card.style.opacity=op.toFixed(3);
+      if(!calm){card.style.transform='translateY('+((1-a)*10).toFixed(1)+'px) scale('+(1+.035*pr).toFixed(4)+')'; $('#stTitle').style.letterSpacing=(.3-.14*pr).toFixed(3)+'em';}
+    }
+    let done=0; for(let k=0;k<i;k++)done+=dur(STORY[k]);
+    $('#stProg').style.width=(Math.min(100,(done+tt)/total*100)).toFixed(2)+'%';
+  }
+  /* schermo sempre acceso durante la storia, come in un video; rilasciato alla fine o alla chiusura */
+  let wl=null;
+  async function lock(){ try{ if('wakeLock' in navigator&&!wl&&!document.hidden){ const l=await navigator.wakeLock.request('screen'); if(!running||$('#stEnd').classList.contains('on')){l.release();return;} wl=l; l.addEventListener('release',()=>{if(wl===l)wl=null;}); } }catch(e){} }
+  function unlock(){ try{ if(wl){const l=wl;wl=null;l.release();} }catch(e){} }
+  document.addEventListener('visibilitychange',()=>{ if(running&&!document.hidden&&!$('#stEnd').classList.contains('on'))lock(); });
+  function end(){ unlock(); card.style.opacity='0'; $('#stEnd').classList.add('on'); $('#stProg').style.width='100%'; paused=true; $('#stPause').textContent='Pausa'; $('#stAgain').focus(); }
+  function open(){
+    opener=document.activeElement; el.hidden=false; document.body.style.overflow='hidden';
+    AU.unlock(); resize(); mkParts(); paused=false; $('#stPause').textContent='Pausa'; syncStMus(); show(0);
+    running=true; last=performance.now(); raf=requestAnimationFrame(frame); $('#stPause').focus(); lock();
+  }
+  function close(){ running=false; unlock(); cancelAnimationFrame(raf); el.hidden=true; document.body.style.overflow=''; if(opener&&opener.focus)opener.focus(); }
+  function pause(){ if($('#stEnd').classList.contains('on'))return; paused=!paused; $('#stPause').textContent=paused?'Riprendi':'Pausa'; }
+  function go(n){ paused=false; if(running)lock(); $('#stPause').textContent='Pausa'; show(Math.max(0,Math.min(STORY.length-1,n))); }
+  addEventListener('resize',()=>{if(running){resize();mkParts();}});
+  document.addEventListener('keydown',e=>{
+    if(el.hidden)return;
+    if(e.key==='Escape')close();
+    else if(e.key==='ArrowRight'){ if(i<STORY.length-1)go(i+1); else end(); }
+    else if(e.key==='ArrowLeft')go(i-1);
+    else if(e.key===' '&&e.target.tagName!=='BUTTON'){e.preventDefault();pause();}
+  });
+  $('#stPause').addEventListener('click',pause);
+  $('#stNext').addEventListener('click',()=>{if(i<STORY.length-1)go(i+1);else end();});
+  $('#stPrev').addEventListener('click',()=>go(i-1));
+  $('#stClose').addEventListener('click',close);
+  $('#stBack').addEventListener('click',close);
+  $('#stAgain').addEventListener('click',()=>go(0));
+  return {open,close};
+})();
+function syncStMus(){ $('#stMus').textContent='Colonna sonora: '+(AU.S.mus?'sì':'no'); $('#optMusic').checked=AU.S.mus; }
+$('#stMus').addEventListener('click',()=>{AU.setMus(!AU.S.mus);syncStMus();});
+$('#storyBtn').addEventListener('click',()=>Story.open());
+syncStMus();
+
+/* ===== Regole illustrate ===== */
+const rg=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
+const chipH=(txt,cls,pre)=>'<span class="chip '+(cls||'')+'">'+(pre||'')+txt+'</span>';
+const okc=t=>chipH(t,'ok','<span class="g">✓</span>'), noc=t=>chipH(t,'no','<span class="g">✕</span>'), resc=(t,c)=>chipH(t,'res '+(c||''));
+const stkH=arr=>arr.map(w=>'<svg class="stk" viewBox="0 0 26 70"><rect x="3" y="2" width="20" height="66" rx="7" fill="'+(w?'#f6efd9':'#14161a')+'" stroke="#0a2c3a" stroke-width="2"/></svg>').join('');
+const dieH=f=>'<svg class="die" viewBox="0 0 48 48"><rect x="3" y="3" width="42" height="42" rx="9" fill="#2a93ad" stroke="#0a2c3a" stroke-width="2"/>'+(f===6?'<path d="M15 15L33 33M33 15L15 33" stroke="#f6efd9" stroke-width="4" stroke-linecap="round"/>':tally(f))+'</svg>';
+function diceTable(rows){
+  return '<div class="dt">'+rows.map(r=>'<div class="dtr"><div class="dtd">'+r.icon+'</div><div class="dtv">'+r.big+'</div><div class="dtt"><b>'+r.t+'</b>'+(r.s?'<span>'+r.s+'</span>':'')+'</div>'
+    +'<div class="dtp"><span class="bar"><i style="width:'+r.bar+'%"></i></span><span>'+r.pt+'</span></div></div>').join('')+'</div>';
+}
+const KROWS=[[1,'Muovi di 1 e rilancia','una faccia bianca',4],[2,'Muovi di 2 e passa la mano','due facce bianche',6],[3,'Muovi di 3 e passa la mano','tre facce bianche',4],[4,'Muovi di 4 e rilancia','quattro facce bianche',1],[6,'Muovi di 6 e rilancia','nessuna faccia bianca',1]]
+  .map(a=>({icon:stkH([0,1,2,3].map(i=>i<(a[0]===6?0:a[0]))),big:String(a[0]),t:a[1],s:a[2],pt:a[3]+' volte su 16',bar:a[3]/6*100}));
+const UROWS=[[1,'Muovi di 1 e rilancia'],[2,'Muovi di 2 e passa la mano'],[3,'Muovi di 3 e passa la mano'],[4,'Muovi di 4 e rilancia'],[5,'Muovi di 5 e rilancia'],[6,'X: si passa senza muovere']]
+  .map(a=>({icon:dieH(a[0]),big:a[0]===6?'X':String(a[0]),t:a[1],s:a[0]===6?'vale meno di qualsiasi altro tiro':'',pt:'1 volta su 6',bar:100}));
+
+function slides(U){
+  const n=U?5:7, ev=[], od=[];
+  for(let i=1;i<=n;i++){ev.push(2*i);od.push(2*i-1);}
+  const RC=(v)=>chipH('Tiro <b>'+(U?'dado '+v:(v===6?'0 facce bianche · 6':v+(v===1?' faccia bianca · ':' facce bianche · ')+v))+'</b>');
+  const A=(seq,o,k,dy)=>({o:o||0,seq,k,dy});
+  const sc=(o)=>Object.assign({type:'board'},o);
+  const L=[];
+  L.push({t:'Il tavoliere',p:[
+    'Il tavoliere ha <b>30 caselle</b> in tre file da dieci. Il percorso è a serpentina: la prima fila va da sinistra a destra (1-10), la seconda da destra a sinistra (11-20), la terza da sinistra a destra (21-30).',
+    'Le ultime cinque caselle hanno disegni e regole speciali: 15 (ankh), 26, 27 (acqua), 28, 29 (occhio di Horus) e 30 (disco solare).'],
+    sc:sc({arrows:[A(rg(1,10)),A(rg(11,20)),A(rg(21,30))],chips:[chipH('Percorso a serpentina: dalla 1 alla 30'),chipH('Caselle speciali: 15, 26, 27, 28, 29, 30')]})});
+  L.push({t:'Disposizione iniziale',p:[
+    'Ogni giocatore ha '+(U?'<b>cinque</b>':'<b>sette</b>')+' pedine ('+(U?'le regole di Kendall e Bell ne prevedono 5; si può scegliere anche 7':'le regole CEMEA ne prevedono 7; si può scegliere anche 5')+'). Le pedine partono <b>alternate</b> sulle prime caselle: '+(U?'dalla 1 alla 10':'dalla 1 alla 14')+'.',
+    'Chi comincia occupa le caselle <b>pari</b>, l\'altro le dispari. Qui comincia Avorio.'],
+    sc:sc({b:ev,r:od,chips:[chipH('Avorio: caselle pari'),chipH('Ebano: caselle dispari')]})});
+  L.push({t:U?'Il dado':'I quattro legnetti',p:U
+    ?['Si usa un dado a sei facce con segni da 1 a 5 e una X. La <b>X</b> vale meno di tutti e non fa muovere.','I punteggi <b>1, 4 e 5</b> permettono di muovere e di <b>rilanciare</b>. Con <b>2 e 3</b> si muove e passa la mano.']
+    :['Si lanciano quattro legnetti a mezzo cilindro: la parte convessa è nera, quella piana bianca. Il punteggio è il numero di <b>facce bianche</b>; se sono tutte nere vale <b>6</b>.','Con <b>1, 4 e 6</b> si muove e si <b>rilancia</b>. Con <b>2 e 3</b> si muove e si passa la mano. Con dado a sei facce si ammette anche il 5.'],
+    sc:{type:'dice',rows:U?UROWS:KROWS}});
+  L.push({t:'Chi comincia',p:U
+    ?['Ogni giocatore lancia il dado e comincia chi ottiene il punteggio più alto (la X vale meno di tutti). In caso di parità si ripete.','Chi comincia occupa le caselle pari e la <b>prima mossa spetta alla pedina in casella 10</b>, la più avanzata.']
+    :['I giocatori lanciano a turno i legnetti finché uno ottiene 1. Chi ci riesce comincia, e occupa le caselle pari.','Altre versioni assegnano la prima mossa a chi ottiene il punteggio più alto.'],
+    sc:sc({b:ev,r:od,chips:U?[RC(4),chipH('Ebano <b>dado 2</b>','res'),resc('Comincia Avorio','win')]:[chipH('Ebano <b>3</b>'),chipH('Avorio <b>2</b>'),chipH('Ebano <b>1</b>'),resc('Comincia Ebano','win')]})});
+  L.push({t:'Muovere una pedina',p:['Si sceglie una pedina e la si fa <b>avanzare</b> esattamente del punteggio ottenuto, saltando le altre pedine. Qui Avorio muove di 3.','Con 2 e 3 il turno passa all\'avversario.'],
+    sc:sc({b:[5],r:[11],roll:RC(3),arrows:[A([5,6,7,8])],marks:[{o:0,sq:8,k:'ok'}],after:{b0:8},res:[resc('Il turno passa')]})});
+  L.push({t:'Rilanciare',p:['Con '+(U?'1, 4 o 5':'1, 4 o 6')+' si muove una pedina e si <b>lancia ancora</b>, anche più volte di seguito. Qui Avorio muove di 4 e rilancia.'],
+    sc:sc({b:[5],r:[11],roll:RC(4),arrows:[A([5,6,7,8,9])],marks:[{o:0,sq:9,k:'ok'}],after:{b0:9},res:[resc('Avorio rilancia','win')]})});
+  L.push({t:'Attaccare',p:['Se il movimento termina su una pedina avversaria si <b>attacca</b>: le due pedine si scambiano di posto. L\'avversaria retrocede fino alla casella da cui è partita l\'attaccante.'],
+    sc:sc({b:[5],r:[8],roll:RC(3),arrows:[A([5,6,7,8])],marks:[{o:0,sq:8,k:'cap'}],after:{b0:8,r0:5},res:[resc('Le pedine si scambiano di posto')]})});
+  L.push({t:'Il muro di due pedine',p:['Due pedine dello stesso colore in <b>caselle contigue</b> formano un muro: non possono essere attaccate, ma si possono <b>superare</b>.','Qui Avorio non può fermarsi sull\'8, ma con un 4 supera il muro e arriva in 9.'],
+    sc:sc({b:[5],r:[7,8],roll:RC(4),arrows:[A([5,6,7,8,9])],marks:[{o:0,sq:8,k:'no'},{o:0,sq:9,k:'ok'}],after:{b0:9},chips:[noc('Attaccare una pedina del muro'),okc('Superarlo')]})});
+  L.push({t:'Il muro di tre pedine',p:['Tre pedine dello stesso colore in tre caselle consecutive formano un <b>muro invalicabile</b>: non si può né attaccarlo né superarlo.','Qui Avorio con un 4 dovrebbe oltrepassare le caselle 6-8: la mossa non è consentita.'],
+    sc:sc({b:[5],r:[6,7,8],roll:RC(4),marks:[{o:0,sq:9,k:'no'}],arrows:[A([5,6,7,8,9],0,'k')],chips:[noc('5 → 9: muro invalicabile')]})});
+  L.push({t:'Non su una propria pedina',p:['Due pedine dello stesso colore non possono occupare la stessa casella: la mossa che termina su una propria pedina non si può fare.','Qui la pedina in 4 non può muovere di 3 (finirebbe sulla 7), ma l\'altra sì.'],
+    sc:sc({b:[4,7],roll:RC(3),marks:[{o:0,sq:7,k:'no'},{o:0,sq:10,k:'ok'}],arrows:[A([7,8,9,10])],after:{b1:10},chips:[noc('4 → 7'),okc('7 → 10')]})});
+  L.push({t:'Tiro nullo: si retrocede',p:['Se nessuna pedina può avanzare di quanto indicato dal punteggio, il giocatore <b>fa retrocedere</b> una pedina a sua scelta del numero di caselle ottenuto (su una casella libera).','Se neppure questo è possibile, passa il turno.'],
+    sc:sc({b:[9],r:[10,11,12],roll:RC(4),arrows:[A([9,8,7,6,5],0,'k')],after:{b0:5},res:[resc('La pedina retrocede di 4')]})});
+  L.push({t:'La casa della rinascita',p:['La casella <b>15</b> (ankh) è la casa della rinascita: la pedina che la occupa <b>non può essere attaccata</b>. Lo stesso vale per la 26, la 28, la 29 e la 30.'],
+    sc:sc({b:[12],r:[15],roll:RC(3),arrows:[A([12,13,14,15],0,'k')],marks:[{o:0,sq:15,k:'no'}],chips:[noc('Attaccare una pedina in 15')]})});
+  L.push({t:'La casa dell\'abbondanza',p:['La casella <b>26</b> è di buon augurio e protegge la pedina. Dalla 26 un <b>1</b> sposterebbe in 27, la casa della malasorte: con un 1 la pedina può invece <b>saltarla</b> e arrivare in 28.','(Le fonti non precisano il salto: qui è interpretato come passaggio 26 → 28.)'],
+    sc:sc({b:[26],roll:RC(1),arrows:[A([26,28])],marks:[{o:0,sq:27,k:'no'},{o:0,sq:28,k:'ok'}],after:{b0:28},chips:[noc('26 → 27'),okc('26 → 28 (salto)')]})});
+  L.push({t:'La casa della malasorte',p:['Una pedina che termina in <b>27</b> (acqua) deve tornare indietro fino alla casa della rinascita, la <b>15</b>.','Passare sopra la 27 senza fermarsi non ha alcun effetto.'],
+    sc:sc({b:[24,9],roll:RC(3),arrows:[A([24,25,26,27]),A([27,15],0,'k')],marks:[{o:0,sq:27,k:'no'},{o:0,sq:15,k:'ok'}],after:{b0:15},res:[resc('La pedina torna in 15')]})});
+  L.push({t:'La 15 è occupata',p:['Se la casa della rinascita è occupata da una pedina avversaria, la pedina resta in 27 e il giocatore rimane <b>bloccato con tutte le sue pedine</b> finché non ottiene <b>4</b>.','(Se la 15 è occupata da una propria pedina, la pedina riparte dalla prima casella libera.)'],
+    sc:sc({b:[24,9],r:[15],roll:RC(3),arrows:[A([24,25,26,27])],marks:[{o:0,sq:27,k:'no'}],after:{b0:27},res:[resc('Avorio è bloccato')]})});
+  L.push({t:'Bloccato: serve un 4',p:['Con il 4 la pedina bloccata <b>esce dal gioco</b>, e il giocatore lancia ancora. Con qualsiasi altro punteggio il turno passa senza muovere nulla, nemmeno all\'indietro.'],
+    sc:sc({b:[27,9],r:[15],ro:0,roll:RC(4),arrows:[A([27,28,29,30,'X'])],after:{b0:31},res:[resc('La pedina esce dal gioco'),resc('Avorio rilancia','win')]})});
+  L.push({t:'Le caselle 28, 29 e 30',p:['Le ultime tre caselle sono rifugi: le pedine non possono essere attaccate. I segni <b>III, II, I</b> indicano il punteggio <b>esatto</b> con cui si esce: 3 dalla 28, 2 dalla 29, 1 dalla 30.','Qui la pedina in 28 esce con un 3.'],
+    sc:sc({b:[28],r:[23],roll:RC(3),arrows:[A([28,29,30,'X'])],after:{b0:31},chips:[chipH('28 · III → 3'),chipH('29 · II → 2'),chipH('30 · I → 1')],res:[resc('La pedina esce dal tavoliere')]})});
+  if(U)L.push({t:'Uscita dalla 30 a inizio turno',p:['Nelle regole di Kendall e Bell, <b>all\'inizio di un nuovo turno</b> la pedina in casella 30 può uscire senza lanciare, ma solo se il giocatore non ha altre pedine nella <b>prima fila</b> (caselle 1-10).','Poi il giocatore lancia normalmente.'],
+    sc:sc({b:[30,16],r:[4],arrows:[A([30,'X'])],after:{b0:31},chips:[okc('Nessuna pedina nelle caselle 1-10')],res:[resc('Esce prima del lancio')]})});
+  L.push({t:'Vittoria',p:['Vince chi per primo porta <b>tutte le proprie pedine</b> fuori dal tavoliere.','Secondo le fonti, in epoca antica entrambi i giocatori dovevano comunque concludere: chi era uscito per primo assisteva l\'altro fino alla meta. Questa regola non è implementata.'],
+    sc:sc({b:[30],bo:n-1,r:[22,14],roll:RC(1),arrows:[A([30,'X'])],after:{b0:31},res:[resc('Avorio vince','win')]})});
+  L.push({t:'Il turno in sintesi',p:['Ecco la sequenza di un turno.'],
+    sc:{type:'flow',steps:[
+     U?'Lancia il dado. Con la X il turno passa.':'Lancia i quattro legnetti e conta le facce bianche (nessuna: 6).',
+     'Muovi una pedina esattamente del punteggio, saltando le altre. Non fermarti su una tua pedina e non superare un muro di tre.',
+     'Se finisci su una pedina avversaria non protetta, scambiate le posizioni. Le pedine in 15, 26, 28, 29, 30 e nei muri di due non si attaccano.',
+     'Se nessuna pedina può avanzare, ne retrocedi una; se non è possibile, passa il turno.',
+     'Finire in 27 riporta in 15 (o blocca fino al 4 se la 15 è occupata dall\'avversario). Dalla 26, un 1 salta la 27.',
+     'Dalla 28 esci con 3, dalla 29 con 2, dalla 30 con 1'+(U?' (o a inizio turno, se non hai pedine nella prima fila)':'')+'.',
+     (U?'Con 1, 4 o 5':'Con 1, 4 o 6')+' rilanci, con 2 o 3 passi la mano. Vince chi porta fuori tutte le pedine.']}});
+  return L;
+}
+const TUTS={kendall:slides(false),uninerd:slides(true)};
+
+let tutRules='kendall', tutI=0, tutS=null, tutTimer=0, tutOpener=null;
+const ARR_MK=['arrh0','arrh1'];
+function pieceEl(o){
+  const g=document.createElementNS(NS,'g'); g.setAttribute('class','piece p'+o);
+  g.innerHTML=pieceInner(o); return g;
+}
+function tutLayout(S,pos){
+  const used=[new Set(),new Set()];
+  S.pcs.forEach(pc=>{ if(pos[pc.id]===31&&S.slot[pc.id]!==undefined)used[pc.o].add(S.slot[pc.id]); else if(pos[pc.id]!==31)delete S.slot[pc.id]; });
+  S.pcs.forEach(pc=>{ if(pos[pc.id]!==31||S.slot[pc.id]!==undefined)return; let i=0; while(used[pc.o].has(i))i++; used[pc.o].add(i); S.slot[pc.id]=i; });
+  S.pcs.forEach(pc=>{
+    const p=pos[pc.id]; let q,s=1;
+    if(p===31){q=slot(pc.o,S.slot[pc.id]);s=SC;} else q=sqXY(p);
+    pc.el.style.transform='translate('+q.x+'px,'+q.y+'px) scale('+s+')';
+  });
+}
+function arrowsSVG(S,list){
+  return list.map(a=>{
+    const pts=a.seq.map(v=>{
+      let q;
+      if(v==='X'){const u=new Set();S.pcs.forEach(pc=>{if(pc.o===a.o&&S.before[pc.id]===31)u.add(S.slot[pc.id]);});let i=0;while(u.has(i))i++;q=slot(a.o,i);}
+      else q=sqXY(v);
+      return q.x+' '+(q.y+(a.dy||0));
+    });
+    const col=a.k==='k'?'#ff7a59':(a.o===0?'#fff0bd':'#12181f'), mk=a.k==='k'?'arrhk':ARR_MK[a.o];
+    return '<path d="M'+pts.join('L')+'" fill="none" stroke="'+col+'" stroke-width="90" stroke-linejoin="round" stroke-linecap="round" opacity=".92" marker-end="url(#'+mk+')"/>';
+  }).join('');
+}
+function marksSVG(list){
+  return list.map(m=>{
+    const q=sqXY(m.sq), tr='translate('+q.x+' '+q.y+')';
+    if(m.k==='ok')return '<g transform="'+tr+'"><circle r="470" class="mk mk-ok"/><path class="mk-g ok" d="M-190 10L-50 160L200 -150"/></g>';
+    if(m.k==='no')return '<g transform="'+tr+'"><circle r="470" class="mk mk-no"/><path class="mk-g no" d="M-170 -170L170 170M170 -170L-170 170"/></g>';
+    return '<g transform="'+tr+'"><circle r="480" class="mk mk-cap"/></g>';
+  }).join('');
+}
+function tutScene(sc){
+  const fig=$('#tutFig'); fig.className='tut-fig'; clearTimeout(tutTimer); tutS=null;
+  if(sc.type==='dice'){fig.innerHTML=diceTable(sc.rows);return;}
+  if(sc.type==='flow'){fig.innerHTML='<ol class="flow">'+sc.steps.map(s=>'<li><span>'+s+'</span></li>').join('')+'</ol>';return;}
+  const pcs=[];
+  [['b',0,sc.b||[],sc.bo||0],['r',1,sc.r||[],sc.ro||0]].forEach(a=>{
+    let i=0; a[2].forEach(p=>pcs.push({id:a[0]+(i++),o:a[1],pos:p}));
+    for(let j=0;j<a[3];j++)pcs.push({id:a[0]+(i++),o:a[1],pos:31});
+  });
+  const before={}; pcs.forEach(pc=>before[pc.id]=pc.pos);
+  const after=Object.assign({},before,sc.after||{});
+  fig.innerHTML='<svg class="tsvg" viewBox="0 0 10800 5160" role="img" aria-label="Scenario sul tavoliere"><g>'+BL.frame+BL.tiles+BL.glyphs+BL.nums+BL.lbls+'</g><g class="ta"></g><g class="tp"></g><g class="tm"></g></svg>'
+    +'<div class="tut-chips">'+(sc.roll||'')+(sc.chips||[]).join('')+(sc.res||[]).join('')+'</div>';
+  const svgEl=fig.querySelector('svg'), layer=fig.querySelector('.tp');
+  pcs.forEach(pc=>{pc.el=pieceEl(pc.o);layer.appendChild(pc.el);});
+  const S={pcs,slot:{},before,after,svg:svgEl}; tutS=S;
+  svgEl.classList.add('noanim'); tutLayout(S,before);
+  fig.querySelector('.ta').innerHTML=arrowsSVG(S,sc.arrows||[]);
+  fig.querySelector('.tm').innerHTML=marksSVG(sc.marks||[]);
+  svgEl.getBoundingClientRect(); svgEl.classList.remove('noanim');
+  if(sc.after){
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){tutLayout(S,after);fig.classList.add('still');}
+    else tutTimer=setTimeout(tutPlay,1100);
+  } else fig.classList.add('still');
+}
+function tutPlay(){ if(!tutS)return; tutLayout(tutS,tutS.after); $('#tutFig').classList.add('played'); }
+function tutReplay(){
+  if(!tutS||!TUTS[tutRules][tutI].sc.after)return;
+  clearTimeout(tutTimer); const S=tutS, fig=$('#tutFig');
+  fig.classList.remove('played'); S.svg.classList.add('noanim'); S.slot={}; tutLayout(S,S.before);
+  S.svg.getBoundingClientRect(); S.svg.classList.remove('noanim');
+  tutTimer=setTimeout(tutPlay,500);
+}
+function tutRender(){
+  const list=TUTS[tutRules], s=list[tutI];
+  $('#tutStep').textContent='Passo '+(tutI+1)+' di '+list.length+' · '+(tutRules==='kendall'?'regole CEMEA':'regole di Kendall e Bell');
+  $('#tutText').innerHTML='<h3>'+s.t+'</h3>'+s.p.map(x=>'<p>'+x+'</p>').join('');
+  tutScene(s.sc);
+  $('#tutPrev').disabled=tutI===0; $('#tutNext').disabled=tutI===list.length-1;
+  $('#tutReplay').hidden=!s.sc.after;
+  $('#tutDots').innerHTML=list.map((x,i)=>'<button type="button" data-i="'+i+'" aria-label="Passo '+(i+1)+': '+x.t+'"'+(i===tutI?' aria-current="true"':'')+'></button>').join('');
+  $('.tut-body').scrollTop=0;
+}
+function tutGo(i){const n=TUTS[tutRules].length; tutI=Math.max(0,Math.min(n-1,i)); tutRender();}
+function openTut(){
+  tutOpener=document.activeElement; tutRules=$('#opts').rules.value; tutI=0;
+  document.querySelectorAll('input[name="trules"]').forEach(r=>r.checked=r.value===tutRules);
+  $('#tut').hidden=false; document.body.style.overflow='hidden'; tutRender(); $('#tutBox').focus();
+}
+function closeTut(){
+  $('#tut').hidden=true; document.body.style.overflow=''; clearTimeout(tutTimer);
+  if(tutOpener&&tutOpener.focus)tutOpener.focus();
+}
+$('#tutBtn').addEventListener('click',openTut);
+$('#tutClose').addEventListener('click',closeTut);
+$('#tutPrev').addEventListener('click',()=>tutGo(tutI-1));
+$('#tutNext').addEventListener('click',()=>tutGo(tutI+1));
+$('#tutReplay').addEventListener('click',tutReplay);
+$('#tutDots').addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(b)tutGo(+b.dataset.i);});
+$('#tutSeg').addEventListener('change',e=>{tutRules=e.target.value;tutI=0;tutRender();});
+$('#tut').addEventListener('click',e=>{if(e.target.id==='tut')closeTut();});
+document.addEventListener('keydown',e=>{
+  if($('#tut').hidden)return;
+  if(e.key==='Escape')closeTut();
+  else if(e.key==='ArrowRight'&&!(e.target.name==='trules'))tutGo(tutI+1);
+  else if(e.key==='ArrowLeft'&&!(e.target.name==='trules'))tutGo(tutI-1);
+  else if(e.key==='Tab'){
+    const f=[...$('#tutBox').querySelectorAll('button:not([disabled]):not([hidden]),input')].filter(x=>x.offsetParent!==null);
+    if(!f.length)return; const a=f[0],z=f[f.length-1];
+    if(e.shiftKey&&(document.activeElement===a||document.activeElement===$('#tutBox'))){e.preventDefault();z.focus();}
+    else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus();}
+  }
+});
+
+startGame();
+})();
+
+</script>
+</body>
+</html>
