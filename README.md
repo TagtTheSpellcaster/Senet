@@ -10,7 +10,7 @@
 
 Versione per browser del Senet, il gioco da tavolo dell'Antico Egitto. È una singola pagina HTML, senza build e senza installazione. Condivide l'architettura del [Gioco Reale di Ur](https://github.com/TagtTheSpellcaster/Gioco-Reale-di-Ur): motore di gioco separato dall'interfaccia, dadi in 3D, animazioni, audio sintetizzato, storia e regole illustrate.
 
-Puoi giocarlo qui: [Senet](https://tagtthespellcaster.github.io/Senet/)
+[Puoi giocarlo qui](https://tagtthespellcaster.github.io/Senet/)
 
 ## Caratteristiche
 
