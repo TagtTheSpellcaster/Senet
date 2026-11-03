@@ -1,6 +1,6 @@
 # Senet
 
-[![Versione](https://img.shields.io/badge/versione-1.0-blue)](#versioni)
+[![Versione](https://img.shields.io/badge/versione-1.3-blue)](#versioni)
 [![Licenza: AGPL v3](https://img.shields.io/badge/licenza-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-222?logo=github)](#pubblicazione-su-github-pages)
 [![HTML5](https://img.shields.io/badge/HTML5-single%20file-E34F26?logo=html5&logoColor=white)](index.html)
