@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  Senet v1.3
+  Senet v1.1
   Copyright (C) 2026 Alessandro Valli
   SPDX-License-Identifier: AGPL-3.0-or-later
 -->
@@ -8,7 +8,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Senet, il gioco egizio del passaggio, nel browser: regole CEMEA e Kendall e Bell, legnetti 3D, audio e storia.">
+<meta name="description" content="Senet, il gioco egizio del passaggio, nel browser (italiano e inglese): regole CEMEA e Kendall e Bell, legnetti 3D, audio e storia.">
 <title>Senet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -264,15 +264,19 @@ details.rules summary{cursor:pointer;font:400 21px var(--font-display);letter-sp
   .stage .pcard{padding:10px 14px}
 }
 
+.lang{display:inline-flex;border:1.5px solid var(--fg);border-radius:8px;overflow:hidden}
+.lang button{font:700 14px var(--font-mono);letter-spacing:.06em;padding:0 12px;min-height:44px;background:transparent;color:var(--fg);border:0;cursor:pointer}
+.lang button+button{border-left:1.5px solid var(--fg)}
+.lang button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+
 </style>
 </head>
 <body>
-
 <main class="wrap">
   <header class="top">
     <h1>Senet</h1>
-    <p class="sub"><span class="ver">v1.3</span> · Il gioco egizio del «passaggio»: trenta caselle, cinque o sette pedine a testa, un viaggio verso l'aldilà.</p>
-    <div class="hbtns"><button type="button" class="btn alt" id="storyBtn">Avvia la storia</button><button type="button" class="btn alt" id="tutBtn">Regole illustrate</button></div>
+    <p class="sub"><span class="ver">v1.1</span> · Il gioco egizio del «passaggio»: trenta caselle, cinque o sette pedine a testa, un viaggio verso l'aldilà.</p>
+    <div class="hbtns"><div class="lang" id="langSeg" role="group" aria-label="Lingua / Language"><button type="button" data-lang="it" aria-pressed="true">IT</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div><button type="button" class="btn alt" id="storyBtn">Avvia la storia</button><button type="button" class="btn alt" id="tutBtn">Regole illustrate</button></div>
   </header>
 
   <div class="stage">
@@ -298,7 +302,7 @@ details.rules summary{cursor:pointer;font:400 21px var(--font-display);letter-sp
       <div class="dice-row">
         <canvas id="diceCanvas" width="400" height="130" aria-hidden="true"></canvas>
         <div class="dice idle" id="dice" aria-hidden="true" hidden></div>
-        <div class="result"><span class="big" id="big">–</span><span class="cap" id="capt">in attesa del primo lancio</span></div>
+        <div class="result"><span class="big" id="big" data-dyn>–</span><span class="cap" id="capt" data-dyn>in attesa del primo lancio</span></div>
       </div>
       <p class="status" id="status"></p>
       <div class="actions">
@@ -411,9 +415,9 @@ details.rules summary{cursor:pointer;font:400 21px var(--font-display);letter-sp
   <div class="st-end" id="stEnd"><button type="button" id="stAgain">Rivedi la storia</button><button type="button" id="stBack">Torna al gioco</button></div>
   <div class="st-ui">
     <button type="button" id="stPrev">‹ Indietro</button>
-    <button type="button" id="stPause">Pausa</button>
+    <button type="button" id="stPause" data-dyn>Pausa</button>
     <button type="button" id="stNext">Avanti ›</button>
-    <button type="button" id="stMus">Colonna sonora: no</button>
+    <button type="button" id="stMus" data-dyn>Colonna sonora: no</button>
     <button type="button" id="stClose">Chiudi</button>
   </div>
   <div class="st-prog" id="stProg"></div>
@@ -444,8 +448,18 @@ details.rules summary{cursor:pointer;font:400 21px var(--font-display);letter-sp
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+var LANGKEY='senet-lang';
+var LANG=(function(){try{var v=localStorage.getItem(LANGKEY);if(v==='it'||v==='en')return v;}catch(e){}return /^it/i.test(navigator.language||'')?'it':'en';})();
+function _(it,en){return LANG==='en'?en:it;}
+var GAME_TITLE={it:'Senet',en:'Senet'};
+document.title=GAME_TITLE[LANG];
+document.documentElement.lang=LANG;
+
+</script>
+<script>
 /*ENGINE_START*/
-const NAMES = ['Avorio', 'Ebano'];
+if (typeof _ === 'undefined') { var _ = (it) => it; }
+let NAMES = [_('Avorio', 'Ivory'), _('Ebano', 'Ebony')];
 const OUT = 31;
 const SAFE = [15, 26, 28, 29, 30];
 const EXIT_NEED = { 28: 3, 29: 2, 30: 1 };
@@ -480,11 +494,11 @@ function rankOf(st, v) { return v; }
 function describeRoll(st, v) {
   const again = AGAIN[st.rules].includes(v);
   let head;
-  if (st.rules === 'kendall') head = v === 6 ? 'Nessuna faccia bianca: 6' : v + (v === 1 ? ' faccia bianca' : ' facce bianche') + ': ' + v;
-  else head = v === 0 ? 'Dado: X' : 'Dado: ' + v;
+  if (st.rules === 'kendall') head = v === 6 ? _('Nessuna faccia bianca: 6', 'No white faces: 6') : v + (v === 1 ? _(' faccia bianca', ' white face') : _(' facce bianche', ' white faces')) + ': ' + v;
+  else head = v === 0 ? _('Dado: X', 'Die: X') : _('Dado: ', 'Die: ') + v;
   let text;
-  if (v === 0) text = 'Il turno passa senza alcuna azione.';
-  else text = 'Muovi una pedina di ' + v + (v === 1 ? ' casella' : ' caselle') + (again ? ' e rilancia.' : ' e passa la mano.');
+  if (v === 0) text = _('Il turno passa senza alcuna azione.', 'The turn passes with no action.');
+  else text = _('Muovi una pedina di ', 'Move a piece ') + v + (v === 1 ? _(' casella', ' square') : _(' caselle', ' squares')) + (again ? _(' e rilancia.', ' and throw again.') : _(' e passa la mano.', ' and pass the turn.'));
   return { head, text, again };
 }
 
@@ -549,7 +563,7 @@ function applyRoll(st, th) {
   st.roll = info;
   st.moves = genMoves(st, v);
   if (!st.moves.length) {
-    ev.push({ p, msg: NAMES[p] + (v === 0 ? ': dado X, il turno passa.' : ': nessuna mossa possibile, il turno passa.') });
+    ev.push({ p, msg: NAMES[p] + (v === 0 ? _(': dado X, il turno passa.', ': die X, the turn passes.') : _(': nessuna mossa possibile, il turno passa.', ': no legal move, the turn passes.')) });
     st.firstMove = false; endTurn(st); info.status = 'pass';
   } else { st.phase = 'move'; info.status = 'move'; }
   return info;
@@ -566,8 +580,8 @@ function applyFreeExit(st) {
   const p = st.turn, pc = st.pieces[freeExit(st)], ev = []; st.fx = { mover: pc.id };
   pc.pos = OUT; st.newTurn = false;
   const n = st.pieces.filter(x => x.owner === p && x.pos === OUT).length;
-  ev.push({ p, msg: NAMES[p] + ' porta nell\'aldilà la pedina in casella 30 (' + n + '/' + st.n + ').' });
-  if (n === st.n) { st.phase = 'over'; st.winner = p; ev.push({ p, msg: NAMES[p] + ' vince la partita.' }); }
+  ev.push({ p, msg: NAMES[p] + _(' porta nell\'aldilà la pedina in casella 30 (', ' moves the piece on square 30 into the afterlife (') + n + '/' + st.n + ').' });
+  if (n === st.n) { st.phase = 'over'; st.winner = p; ev.push({ p, msg: NAMES[p] + _(' vince la partita.', ' wins the game.') }); }
   return ev;
 }
 
@@ -578,32 +592,32 @@ function applyMove(st, m) {
   if (m.kind === 'exit') {
     pc.pos = OUT;
     const n = st.pieces.filter(x => x.owner === p && x.pos === OUT).length;
-    ev.push({ p, msg: NAMES[p] + (m.from === 27 ? ' esce con un 4 dalla casella della malasorte' : ' porta nell\'aldilà la pedina in casella ' + m.from) + ' (' + n + '/' + st.n + ').' });
+    ev.push({ p, msg: NAMES[p] + (m.from === 27 ? _(' esce con un 4 dalla casella della malasorte', ' leaves the House of Misfortune with a 4') : _(' porta nell\'aldilà la pedina in casella ', ' moves the piece on square ') + m.from + _('', ' into the afterlife')) + ' (' + n + '/' + st.n + ').' });
   } else {
-    if (m.kind === 'back') ev.push({ p, msg: NAMES[p] + ' retrocede dalla casella ' + m.from + ' alla ' + m.to + '.' });
-    else if (m.kind === 'jump') ev.push({ p, msg: NAMES[p] + ' salta la casa della malasorte: dalla 26 alla 28.' });
-    else ev.push({ p, msg: NAMES[p] + ' muove dalla casella ' + m.from + ' alla ' + m.to + '.' });
+    if (m.kind === 'back') ev.push({ p, msg: NAMES[p] + _(' retrocede dalla casella ', ' moves back from square ') + m.from + _(' alla ', ' to ') + m.to + '.' });
+    else if (m.kind === 'jump') ev.push({ p, msg: NAMES[p] + _(' salta la casa della malasorte: dalla 26 alla 28.', ' skips the House of Misfortune: from 26 to 28.') });
+    else ev.push({ p, msg: NAMES[p] + _(' muove dalla casella ', ' moves from square ') + m.from + _(' alla ', ' to ') + m.to + '.' });
     if (m.cap != null) {
       const q = st.pieces[m.cap]; q.pos = m.from;
-      ev.push({ p, msg: NAMES[p] + ' attacca: ' + NAMES[1 - p] + ' e ' + NAMES[p] + ' si scambiano di posto (' + m.to + ' e ' + m.from + ').' });
+      ev.push({ p, msg: NAMES[p] + _(' attacca: ', ' attacks: ') + NAMES[1 - p] + _(' e ', ' and ') + NAMES[p] + _(' si scambiano di posto (', ' swap places (') + m.to + _(' e ', ' and ') + m.from + ').' });
     }
     pc.pos = m.to;
     if (pc.pos === 27) {
       const o = at(st, 15);
-      if (!o) { st.fx.via = 27; pc.pos = 15; ev.push({ p, msg: 'Casa della malasorte: la pedina di ' + NAMES[p] + ' torna alla casa della rinascita (15).' }); }
+      if (!o) { st.fx.via = 27; pc.pos = 15; ev.push({ p, msg: _('Casa della malasorte: la pedina di ', 'House of Misfortune: the piece of ') + NAMES[p] + _(' torna alla casa della rinascita (15).', ' returns to the House of Rebirth (15).') }); }
       else if (o.owner === p) {
         const f = freeAfter(st); st.fx.via = 27; pc.pos = f;
-        ev.push({ p, msg: 'Casa della malasorte: la 15 è occupata da una pedina di ' + NAMES[p] + ', la pedina riparte dalla casella ' + f + '.' });
-      } else { st.stuck[p] = pc.id; ev.push({ p, msg: 'Casa della malasorte: la 15 è occupata da ' + NAMES[1 - p] + '. ' + NAMES[p] + ' resta bloccato finché non ottiene 4.' }); }
+        ev.push({ p, msg: _('Casa della malasorte: la 15 è occupata da una pedina di ', 'House of Misfortune: square 15 is occupied by a piece of ') + NAMES[p] + _(', la pedina riparte dalla casella ', ', the piece restarts from square ') + f + '.' });
+      } else { st.stuck[p] = pc.id; ev.push({ p, msg: _('Casa della malasorte: la 15 è occupata da ', 'House of Misfortune: square 15 is occupied by ') + NAMES[1 - p] + '. ' + NAMES[p] + _(' resta bloccato finché non ottiene 4.', ' is blocked until a 4 is thrown.') }); }
     }
   }
   if (st.pieces.filter(x => x.owner === p && x.pos === OUT).length === st.n) {
     st.phase = 'over'; st.winner = p; st.moves = [];
-    ev.push({ p, msg: NAMES[p] + ' vince la partita.' }); return ev;
+    ev.push({ p, msg: NAMES[p] + _(' vince la partita.', ' wins the game.') }); return ev;
   }
   if (AGAIN[st.rules].includes(v)) {
     st.phase = 'roll'; st.moves = []; st.again = true; st.newTurn = false;
-    ev.push({ p, msg: NAMES[p] + ' rilancia.' });
+    ev.push({ p, msg: NAMES[p] + _(' rilancia.', ' throws again.') });
   } else endTurn(st);
   return ev;
 }
@@ -641,6 +655,39 @@ function cpuChoose(st, rng) {
 (function(){
 'use strict';
 const $=(s,r)=>(r||document).querySelector(s);
+/* ===== lingua: selettore IT/EN, traduzione dell'interfaccia statica, ganci per i testi dinamici ===== */
+const langHooks=[];
+const I18N_EN={"<span class=\"ver\">v1.1<\/span> · Il gioco egizio del «passaggio»: trenta caselle, cinque o sette pedine a testa, un viaggio verso l'aldilà.": "<span class=\"ver\">v1.1<\/span> · The Egyptian game of the “passage”: thirty squares, five or seven pieces each, a journey to the afterlife.", "Avvia la storia": "Start the story", "Regole illustrate": "Illustrated rules", "Tavoliere del Senet": "Senet board", "Tira i legnetti": "Throw the casting sticks", "Porta fuori la pedina in 30": "Bear off the piece on 30", "Nuova partita": "New game", "Impostazioni": "Settings", "Regole": "Rules", "CEMEA · 4 legnetti": "CEMEA · 4 casting sticks", "Kendall e Bell · dado": "Kendall and Bell · die", "Avversario": "Opponent", "Computer": "Computer", "Due giocatori": "Two players", "Pedine a testa": "Pieces per side", "7 · regole CEMEA": "7 · CEMEA rules", "5 · regole Kendall e Bell": "5 · Kendall and Bell rules", "Tavoliere": "Board", "Numera le caselle del percorso": "Number the squares of the path", "Audio": "Audio", "Effetti sonori": "Sound effects", "Colonna sonora<small>Musica d'ambiente di ispirazione egizia, generata dal browser. Vale anche per la storia.<\/small>": "Soundtrack<small>Ambient music with an Egyptian flavour, generated by the browser. It also applies to the story.<\/small>", "Cronaca": "Log", "Regole, interpretazioni e fonti": "Rules, interpretations and sources", "Scopo": "Objective", "Portare fuori dal tavoliere, nell'aldilà, tutte le proprie pedine prima dell'avversario. Il percorso ha 30 caselle disposte in tre file da 10 e si legge a serpentina: la prima fila da sinistra a destra (1-10), la seconda da destra a sinistra (11-20), la terza da sinistra a destra (21-30).": "Bear all your pieces off the board, into the afterlife, before your opponent. The path has 30 squares arranged in three rows of 10 and is read in boustrophedon order: the first row left to right (1-10), the second row right to left (11-20), the third row left to right (21-30).", "Lancio": "Throw", "CEMEA: quattro legnetti con una faccia bianca e una nera. Si conta il numero di facce bianche: 1, 2, 3 o 4; nessuna faccia bianca vale 6.": "CEMEA: four casting sticks, each with a white and a black face. The score is the number of white faces: 1, 2, 3 or 4; no white face counts as 6.", "Kendall e Bell: un dado a sei facce (1-5 e X). La X non muove nulla.": "Kendall and Bell: a six-sided die (1-5 and X). The X moves nothing.", "Con 1, 4 e 6 (legnetti) oppure 1, 4 e 5 (dado) si muove e si rilancia; con 2 e 3 si muove e si passa la mano.": "With 1, 4 and 6 (casting sticks) or 1, 4 and 5 (die) you move and throw again; with 2 and 3 you move and pass the turn.", "Movimento": "Movement", "Una pedina avanza esattamente del punteggio ottenuto. Non si può terminare su una propria pedina.": "A piece advances exactly the score obtained. You may not end on one of your own pieces.", "Se si termina su una pedina avversaria, le due pedine si scambiano di posto.": "If you end on an opposing piece, the two pieces swap places.", "Due pedine dello stesso colore in caselle contigue formano un muro che non si può attaccare, ma si può superare. Tre pedine consecutive formano un muro invalicabile.": "Two pieces of the same colour on adjacent squares form a wall that cannot be attacked but can be passed. Three consecutive pieces form a wall that cannot be passed.", "Se nessuna pedina può avanzare, se ne fa retrocedere una a scelta del punteggio ottenuto; se neppure questo è possibile, si passa.": "If no piece can advance, you must move one piece of your choice backwards by the score obtained; if that is not possible either, you pass.", "Le cinque case": "The five houses", "15, casa della rinascita: la pedina non può essere attaccata.": "15, House of Rebirth: the piece cannot be attacked.", "26, casa dell'abbondanza: protetta. Con un 1 la pedina può saltare la casa della malasorte e andare in 28.": "26, House of Abundance: protected. With a 1 the piece may skip the House of Misfortune and go to 28.", "27, casa della malasorte: la pedina torna in 15. Se la 15 è occupata da una pedina avversaria, il giocatore resta bloccato con tutte le pedine finché non ottiene 4, che porta fuori la pedina sventurata.": "27, House of Misfortune: the piece goes back to 15. If 15 is occupied by an opposing piece, the player is blocked with all pieces until a 4 is thrown, which bears off the unlucky piece.", "28, 29 e 30: rifugi, le pedine non si possono attaccare. Si esce con il punteggio esatto indicato: 3 dalla 28 (III), 2 dalla 29 (II), 1 dalla 30 (I).": "28, 29 and 30: refuges, the pieces cannot be attacked. A piece leaves only with the exact score shown: 3 from 28 (III), 2 from 29 (II), 1 from 30 (I).", "Kendall e Bell: all'inizio del turno la pedina in 30 può uscire senza lancio, ma solo se il giocatore non ha altre pedine nella prima fila.": "Kendall and Bell: at the start of the turn the piece on 30 may leave without a throw, but only if the player has no other pieces in the first row.", "Inizio": "Setup", "Le pedine partono alternate sulle prime caselle: 14 con sette pedine a testa, 10 con cinque.": "The pieces start alternating on the first squares: 14 with seven pieces each, 10 with five.", "CEMEA: si lancia a turno finché uno ottiene 1; chi ci riesce comincia e occupa le caselle pari. Kendall e Bell: comincia chi ottiene il punteggio più alto (la X vale meno di tutti), che occupa le caselle pari; la prima mossa spetta alla pedina in casella 10.": "CEMEA: players throw in turn until one gets a 1; whoever succeeds starts and occupies the even squares. Kendall and Bell: whoever gets the highest score starts (X is lower than all), and occupies the even squares; the first move must be made by the piece on square 10.", "Interpretazioni adottate": "Adopted interpretations", "Le fonti non sono univoche e le regole originali non ci sono pervenute: le versioni sono ricostruzioni. Qui sono tenute distinte la ricostruzione del gruppo CEMEA (7 pedine, legnetti) e quella di Kendall e Bell (5 pedine, dado).": "The sources are not unambiguous and the original rules have not survived: the versions are reconstructions. Here the CEMEA group's reconstruction (7 pieces, casting sticks) and that of Kendall and Bell (5 pieces, die) are kept separate.", "Casa dell'abbondanza: «saltare la malasorte» con un 1 è interpretato come passaggio diretto dalla 26 alla 28. Le fonti non dicono altro.": "House of Abundance: “skipping the misfortune” with a 1 is interpreted as a direct move from 26 to 28. The sources say nothing further.", "Casa della malasorte con la 15 occupata da una propria pedina: la pedina riparte dalla prima casella libera. Con la 15 occupata dall'avversario si resta bloccati: così le due regole sui «pezzi propri» e sulla «15 occupata» non si contraddicono.": "House of Misfortune with 15 occupied by one of the player's own pieces: the piece restarts from the first free square. With 15 occupied by the opponent the player stays blocked: this way the two rules on “own pieces” and on “occupied 15” do not contradict each other.", "Il 4 che libera la pedina bloccata la porta fuori dal tavoliere e conta come pedina in salvo, come previsto dalla regola CEMEA. Le fonti non precisano altro.": "The 4 that frees the blocked piece bears it off the board and counts as a piece safely out, as provided by the CEMEA rule. The sources give no further detail.", "Le pedine in 28, 29 e 30 lasciano la casella solo con il punteggio esatto. Il movimento all'indietro del «tiro nullo» è consentito solo verso caselle libere.": "Pieces on 28, 29 and 30 leave the square only with the exact score. The backward move of the “null throw” is allowed only onto free squares.", "Vince chi porta fuori per primo tutte le pedine. In epoca antica, secondo l'articolo, entrambi dovevano arrivare in fondo e chi era uscito per primo assisteva l'altro: qui non è implementato.": "The winner is whoever bears off all their pieces first. In ancient times, according to the article, both players had to reach the end and whoever had left first helped the other: this is not implemented here.", "Fonti": "Sources", "Voce «Senet», Wikipedia, che riporta le regole del gruppo di ricerca sul gioco dei CEMEA (set CEMEA).": "“Senet” entry, Wikipedia, which reports the rules of the CEMEA research group on the game (CEMEA set).", "Regole di Timothy Kendall e R.C. Bell, nell'adattamento UniNerd (set Kendall e Bell).": "Rules by Timothy Kendall and R.C. Bell, in the UniNerd adaptation (Kendall and Bell set).", "La storia del Senet": "The story of Senet", "Rivedi la storia": "Review the story", "Torna al gioco": "Back to the game", "‹ Indietro": "‹ Back", "Avanti ›": "Next ›", "Chiudi": "Close", "Set di regole": "Rule set", "CEMEA": "CEMEA", "Kendall e Bell": "Kendall and Bell", "Indietro": "Back", "Riproduci": "Play", "Avanti": "Next"};
+const i18nUnits=[];
+(function(){
+  const INL=/^(B|I|EM|STRONG|SMALL|SPAN|CODE|BR|A|SUB|SUP|U)$/i;
+  const walk=el=>{
+    if(el.nodeType!==1||el.hasAttribute('data-dyn'))return;
+    ['aria-label','title'].forEach(a=>{if(el.hasAttribute(a))i18nUnits.push({el,attr:a,it:el.getAttribute(a)});});
+    if(/^(SCRIPT|STYLE|SVG|CANVAS|NOSCRIPT)$/i.test(el.tagName))return;
+    let hasText=false,allInline=true;
+    el.childNodes.forEach(n=>{if(n.nodeType===3&&n.nodeValue.trim())hasText=true;else if(n.nodeType===1&&!INL.test(n.tagName))allInline=false;});
+    if(hasText&&allInline){i18nUnits.push({el,attr:null,it:el.innerHTML.trim()});return;}
+    el.childNodes.forEach(walk);
+  };
+  walk(document.body);
+})();
+window.__i18nKeys=i18nUnits.map(u=>u.it);
+function i18nApply(){
+  i18nUnits.forEach(u=>{
+    const v=LANG==='en'&&I18N_EN[u.it]!=null?I18N_EN[u.it]:u.it;
+    if(u.attr)u.el.setAttribute(u.attr,v); else if(u.el.innerHTML.trim()!==v)u.el.innerHTML=v;
+  });
+  document.querySelectorAll('#langSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.lang===LANG?'true':'false'));
+  document.documentElement.lang=LANG; document.title=GAME_TITLE[LANG];
+}
+function setLang(l){
+  if(l!=='it'&&l!=='en')return; LANG=l; try{localStorage.setItem(LANGKEY,l);}catch(e){}
+  i18nApply(); langHooks.forEach(f=>{try{f();}catch(e){}});
+}
+document.querySelectorAll('#langSeg button').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));
+i18nApply();
+
 const NS='http://www.w3.org/2000/svg';
 /* geometria: caselle da 1000 unità, tre file da dieci, vassoi dell'aldilà sotto il tavoliere */
 const S=1000,G=40,M=220;
@@ -691,9 +738,10 @@ function boardLayers(){
     n+='<text class="num" x="'+(x+60)+'" y="'+(y+200)+'">'+s+'</text>';
   }
   L.tiles=t; L.glyphs=gl; L.nums=n;
-  L.lbls='<text class="lbl" x="'+(TRAY[0]+130)+'" y="'+(TY+215)+'">Aldilà · Avorio</text><text class="lbl" x="'+(TRAY[1]+130)+'" y="'+(TY+215)+'">Aldilà · Ebano</text>';
+  L.lbls=lblsHTML();
   return L;
 }
+function lblsHTML(){return '<text class="lbl" x="'+(TRAY[0]+130)+'" y="'+(TY+215)+'">'+_('Aldilà','Afterlife')+' · '+NAMES[0]+'</text><text class="lbl" x="'+(TRAY[1]+130)+'" y="'+(TY+215)+'">'+_('Aldilà','Afterlife')+' · '+NAMES[1]+'</text>';}
 const BL=boardLayers();
 $('#frame').innerHTML=BL.frame;$('#tiles').innerHTML=BL.tiles;$('#glyphs').innerHTML=BL.glyphs;$('#nums').innerHTML=BL.nums;$('#lbls').innerHTML=BL.lbls;
 
@@ -945,10 +993,10 @@ function moveFor(pc){
   const ok=st.moves.findIndex(m=>m.id===pc.id&&m.kind!=='jump'); return ok>=0?ok:st.moves.findIndex(m=>m.id===pc.id);
 }
 function moveLabel(m){
-  if(m.kind==='exit')return 'Porta fuori la pedina in casella '+m.from;
-  if(m.kind==='back')return 'Pedina in casella '+m.from+', retrocedi alla '+m.to;
-  if(m.kind==='jump')return 'Pedina in casella '+m.from+', salta la malasorte e vai alla '+m.to;
-  return 'Pedina in casella '+m.from+', muovi alla '+m.to+(m.cap!=null?' e attacca':'');
+  if(m.kind==='exit')return _('Porta fuori la pedina in casella ','Bear off the piece on square ')+m.from;
+  if(m.kind==='back')return _('Pedina in casella ','Piece on square ')+m.from+_(', retrocedi alla ',', move back to ')+m.to;
+  if(m.kind==='jump')return _('Pedina in casella ','Piece on square ')+m.from+_(', salta la malasorte e vai alla ',', skip the House of Misfortune and go to ')+m.to;
+  return _('Pedina in casella ','Piece on square ')+m.from+_(', muovi alla ',', move to ')+m.to+(m.cap!=null?_(' e attacca',' and attack'):'');
 }
 
 function panels(){
@@ -957,35 +1005,35 @@ function panels(){
     let m='';for(let i=0;i<st.n;i++)m+='<i class="'+(i<out?'on':'')+'"></i>';
     const el=$('#pc'+p), sp=stuckPiece(st,p);
     el.className='pcard'+(st.turn===p&&st.phase!=='over'?' active':'');
-    el.innerHTML='<span class="sw p'+p+'"></span><div class="pname">'+NAMES[p]+'<span class="tag">'+(p===1&&cpuOn?'computer':'giocatore')+'</span></div>'
+    el.innerHTML='<span class="sw p'+p+'"></span><div class="pname">'+NAMES[p]+'<span class="tag">'+(p===1&&cpuOn?_('computer','computer'):_('giocatore','player'))+'</span></div>'
       +'<div class="meter" aria-hidden="true">'+m+'</div>'
-      +'<div class="meta">Nell\'aldilà '+out+'/'+st.n+' · in gioco '+inp+(sp?' · bloccato in 27':'')+'</div>';
+      +'<div class="meta">'+_('Nell\'aldilà ','In the afterlife ')+out+'/'+st.n+_(' · in gioco ',' · in play ')+inp+(sp?_(' · bloccato in 27',' · blocked on 27'):'')+'</div>';
   }
   const over=st.phase==='over';
   $('#againBtn').hidden=!over;
   const human=!isCpu(st.turn)&&!busy&&!rolling;
   const canRoll=st.phase==='roll'&&human;
   const rb=$('#rollBtn'); rb.hidden=over; rb.disabled=!canRoll;
-  const dev=st.rules==='kendall'?'i legnetti':'il dado';
-  rb.textContent=st.again?'Tira ancora':'Tira '+dev;
+  const dev=st.rules==='kendall'?_('i legnetti','the casting sticks'):_('il dado','the die');
+  rb.textContent=st.again?_('Tira ancora','Throw again'):_('Tira ','Throw ')+dev;
   const fe=!over&&canRoll&&freeExit(st)!=null; $('#exitBtn').hidden=!fe;
   $('#status').innerHTML=statusHTML();
 }
 function statusHTML(){
-  const p=st.turn, N='<b>'+NAMES[p]+'</b>', dev=st.rules==='kendall'?'i legnetti':'il dado';
-  if(st.phase==='over')return '<b>'+NAMES[st.winner]+' vince.</b> Ha portato nell\'aldilà tutte le '+st.n+' pedine.';
-  if(rolling)return 'Lancio…';
-  if(note)return note;
+  const p=st.turn, N='<b>'+NAMES[p]+'</b>', dev=st.rules==='kendall'?_('i legnetti','the casting sticks'):_('il dado','the die');
+  if(st.phase==='over')return '<b>'+NAMES[st.winner]+_(' vince.</b> Ha portato nell\'aldilà tutte le ',' wins.</b> All ')+st.n+_(' pedine.',' pieces have been borne off to the afterlife.');
+  if(rolling)return _('Lancio…','Throwing…');
+  if(note)return typeof note==='function'?note():note;
   if(st.phase==='move'){
     const d=describeRoll(st,st.roll.v);
-    if(isCpu(p))return N+' (computer) sceglie la mossa. '+d.head+'.';
-    if(selected!=null){const m=st.moves[selected];return d.head+'. '+moveLabel(m)+'. Tocca di nuovo la pedina o la casella tratteggiata per confermare.';}
+    if(isCpu(p))return N+_(' (computer) sceglie la mossa. ',' (computer) is choosing a move. ')+d.head+'.';
+    if(selected!=null){const m=st.moves[selected];return d.head+'. '+moveLabel(m)+_('. Tocca di nuovo la pedina o la casella tratteggiata per confermare.','. Tap the piece or the dashed square again to confirm.');}
     const back=st.moves.every(m=>m.kind==='back');
-    return d.head+'. '+(back?'Nessuna pedina può avanzare: ne retrocede una. ':d.text+' ')+'Tocca una pedina evidenziata.'+(st.moves.some(m=>m.kind==='jump')?' Dalla 26 puoi toccare la casella 28 per saltare la malasorte.':'');
+    return d.head+'. '+(back?_('Nessuna pedina può avanzare: ne retrocede una. ','No piece can advance: one moves back. '):d.text+' ')+_('Tocca una pedina evidenziata.','Tap a highlighted piece.')+(st.moves.some(m=>m.kind==='jump')?_(' Dalla 26 puoi toccare la casella 28 per saltare la malasorte.',' From 26 you can tap square 28 to skip the House of Misfortune.'):'');
   }
-  if(isCpu(p))return N+' (computer) lancia…';
-  if(stuckPiece(st,p))return N+' è bloccato in casa 27: serve un 4. Lancia.';
-  return (st.again?N+' ha diritto a un altro lancio.':'Tocca a '+N+'.')+' Lancia '+dev+'.'+(freeExit(st)!=null?' Puoi anche portare fuori la pedina in 30.':'');
+  if(isCpu(p))return N+_(' (computer) lancia…',' (computer) is throwing…');
+  if(stuckPiece(st,p))return N+_(' è bloccato in casa 27: serve un 4. Lancia.',' is blocked on square 27: a 4 is needed. Throw.');
+  return (st.again?N+_(' ha diritto a un altro lancio.',' is entitled to another throw.'):_('Tocca a ','It is ')+N+_('.',"'s turn."))+_(' Lancia ',' Throw ')+dev+'.'+(freeExit(st)!=null?_(' Puoi anche portare fuori la pedina in 30.',' You can also bear off the piece on 30.'):'');
 }
 
 /* flusso */
@@ -1019,15 +1067,15 @@ function doRoll(){
     rolling=false;
     const snap=snapshot(), info=applyRoll(st,th);
     const d=describeRoll(st,th.v);
-    $('#big').textContent=th.v===0?'X':th.v; $('#capt').textContent=d.head.split(':')[0].toLowerCase();
+    $('#big').textContent=th.v===0?'X':th.v; setCapt(()=>describeRoll(st,th.v).head.split(':')[0].toLowerCase());
     const hs=d.head.replace(': ',' → ').replace(/^./,c=>c.toLowerCase());
-    pushLog([{p:info.p,msg:NAMES[info.p]+' tira: '+hs+'.'}].concat(info.ev));
+    pushLog([{p:info.p,msg:NAMES[info.p]+_(' tira: ',' throws: ')+hs+'.'}].concat(info.ev));
     if(info.status==='move'){
       busy=false; render();
       if(isCpu(st.turn))later(cpuMove,1000);
     } else {
       busy=true; AU.pass();
-      note=d.head+'. '+(th.v===0?'Il turno passa.':'Nessuna mossa possibile: il turno passa.');
+      note=()=>describeRoll(st,th.v).head+'. '+(th.v===0?_('Il turno passa.','The turn passes.'):_('Nessuna mossa possibile: il turno passa.','No legal move: the turn passes.'));
       render(); await wait(1500); if(g!==gen)return;
       busy=false; next();
     }
@@ -1062,6 +1110,10 @@ $('#rollBtn').addEventListener('click',doRoll);
 $('#exitBtn').addEventListener('click',doFreeExit);
 
 /* nuova partita */
+let captF=null;
+function setCapt(f){captF=f;$('#capt').textContent=f();}
+langHooks.unshift(()=>{NAMES[0]=_('Avorio','Ivory');NAMES[1]=_('Ebano','Ebony');});
+langHooks.push(()=>{$('#lbls').innerHTML=lblsHTML();if(captF)$('#capt').textContent=captF();if(st)render();});
 function startGame(){
   gen++; busy=false; rolling=false; selected=null; note='';
   const f=$('#opts'), rules=f.rules.value, n=+f.npc.value;
@@ -1069,10 +1121,10 @@ function startGame(){
   const tmp={rules}; let first, msg;
   if(rules==='kendall'){
     let p=0,vals=[],v; do{v=rollThrow(tmp,Math.random).v; vals.push(NAMES[p]+' '+v); if(v===1)break; p=1-p;}while(vals.length<60);
-    first=v===1?p:0; msg='Tiri d\'apertura (si lancia a turno finché uno ottiene 1): '+vals.join(', ')+'. Comincia '+NAMES[first]+', sulle caselle pari.';
+    first=v===1?p:0; msg=_('Tiri d\'apertura (si lancia a turno finché uno ottiene 1): ','Opening throws (players throw in turn until one gets 1): ')+vals.join(', ')+_('. Comincia ','. ')+NAMES[first]+_(', sulle caselle pari.',' starts, on the even squares.');
   } else {
     let a,b; do{a=rollThrow(tmp,Math.random).v;b=rollThrow(tmp,Math.random).v;}while(a===b);
-    first=a>b?0:1; const L=x=>x===0?'X':x; msg='Tiro d\'apertura: '+NAMES[0]+' '+L(a)+', '+NAMES[1]+' '+L(b)+' (la X vale meno di tutti). Comincia '+NAMES[first]+', sulle caselle pari: la prima mossa spetta alla pedina in casella 10.';
+    first=a>b?0:1; const L=x=>x===0?'X':x; msg=_('Tiro d\'apertura: ','Opening throw: ')+NAMES[0]+' '+L(a)+', '+NAMES[1]+' '+L(b)+_(' (la X vale meno di tutti). Comincia ',' (X ranks lowest). ')+NAMES[first]+_(', sulle caselle pari: la prima mossa spetta alla pedina in casella 10.',' starts, on the even squares: the first move must be made by the piece on square 10.');
   }
   st=newState({rules,n,first});
   animating.clear(); Object.keys(SLOTS).forEach(k=>delete SLOTS[k]);
@@ -1080,7 +1132,7 @@ function startGame(){
   $('#log').innerHTML=''; pushLog([{msg}]);
   if(D3)D3.mode(rules==='kendall'?'sticks':'die');
   document.querySelectorAll('#frame .tslot').forEach(c=>{c.style.display=+c.dataset.i>=n?'none':'';});
-  showDice(restFaces(),true); $('#big').textContent='–'; $('#capt').textContent='in attesa del primo lancio';
+  showDice(restFaces(),true); $('#big').textContent='–'; setCapt(()=>_('in attesa del primo lancio','waiting for the first throw'));
   next();
 }
 $('#opts').addEventListener('submit',e=>{e.preventDefault();startGame();});
@@ -1245,22 +1297,22 @@ $('#optMusic').addEventListener('change',e=>{AU.setMus(e.target.checked);syncStM
 
 /* ===== Storia ===== */
 const STORY=[
- {t:'Senet',b:'Il gioco del passaggio',art:'ankh'},
- {k:'Antico Egitto',b:'Il senet è uno dei giochi più antichi di cui si abbia notizia. Alcuni lo considerano un antenato del backgammon.'},
- {k:'Nelle tombe',b:'La sua storia è raccontata dai reperti ritrovati nelle tombe del Medio e del Nuovo Regno: tavole, pedine, immagini di giocatori.',art:'board'},
- {k:'Il nome',b:'Senet significa «passaggio». Il gioco era una sfida, ma portava con sé un significato religioso: il passaggio dalla vita terrena all\'aldilà.',art:'eye'},
- {k:'I faraoni',b:'All\'inizio lo giocava soltanto la classe più alta, quella dei faraoni.'},
- {k:'Intorno al 1500 a.C.',b:'Il senet diventa un gioco per tutti. E assume un nuovo significato: si comincia a credere che la sorte dopo la morte dipenda da una partita.',art:'sun'},
- {k:'Il defunto e il Destino',b:'Una partita giocata dal defunto contro il Destino in persona. È il motivo per cui le tombe sono piene di giochi, immagini e spiegazioni di partite.'},
- {k:'Tutankhamon',b:'Nella sua tomba sono stati ritrovati tavoli da gioco in legno e avorio, con i cassetti per le pedine sotto la tavola.',art:'board'},
- {k:'Geroglifici',b:'Figure di giocatori di senet compaiono anche nei geroglifici che raccontano la vita quotidiana e il passaggio dalla vita alla morte.'},
- {k:'I legnetti',b:'Si lanciavano quattro legnetti a mezzo cilindro: convessi e neri da un lato, piani e bianchi dall\'altro. Il punteggio era il numero di facce bianche.',art:'sticks'},
- {k:'Il viaggio',b:'Trenta caselle in tre file. Le ultime cinque hanno un significato speciale: la rinascita, l\'abbondanza, la malasorte, le tre verità, Horus, Ra.',art:'water'},
- {k:'Regole perdute',b:'Nessuna copia integrale delle regole è arrivata fino a noi. Studiosi come Timothy Kendall e R.C. Bell le hanno ricostruite: oggi esistono molte varianti.'},
- {k:'Fino alla fine',b:'In epoca antica forse entrambi i giocatori dovevano concludere la partita. Chi era uscito per primo non abbandonava l\'altro: lo assisteva fino alla meta.'},
- {k:'Nella cultura di massa',b:'Il senet compare nel videogioco «Egypt 1156 a.C.: l\'enigma della tomba reale» (Cryo Interactive, 1997), in «Tomb Raider: The Last Revelation» (1999) e nella serie «Lost», come passatempo del giovane Jacob e di suo fratello.'},
- {t:'Tocca a te',b:'Trenta caselle, cinque o sette pedine. Porta tutto nell\'aldilà.',art:'ankh'},
- {k:'Fonti',b:'Voce «Senet», Wikipedia, e regole di Timothy Kendall e R.C. Bell nell\'adattamento UniNerd.',small:true}
+ {t:'Senet',b:'Il gioco del passaggio',art:'ankh',en:{t:'Senet',b:'The game of passing'}},
+ {k:'Antico Egitto',b:'Il senet è uno dei giochi più antichi di cui si abbia notizia. Alcuni lo considerano un antenato del backgammon.',en:{k:'Ancient Egypt',b:'Senet is one of the oldest games of which there is any record. Some regard it as an ancestor of backgammon.'}},
+ {k:'Nelle tombe',b:'La sua storia è raccontata dai reperti ritrovati nelle tombe del Medio e del Nuovo Regno: tavole, pedine, immagini di giocatori.',art:'board',en:{k:'In the tombs',b:'Its history is told by finds from tombs of the Middle and New Kingdoms: boards, pieces, images of players.'}},
+ {k:'Il nome',b:'Senet significa «passaggio». Il gioco era una sfida, ma portava con sé un significato religioso: il passaggio dalla vita terrena all\'aldilà.',art:'eye',en:{k:'The name',b:'Senet means «passing». The game was a contest, but it also carried a religious meaning: the passage from earthly life to the afterlife.'}},
+ {k:'I faraoni',b:'All\'inizio lo giocava soltanto la classe più alta, quella dei faraoni.',en:{k:'The pharaohs',b:'At first it was played only by the highest class, that of the pharaohs.'}},
+ {k:'Intorno al 1500 a.C.',b:'Il senet diventa un gioco per tutti. E assume un nuovo significato: si comincia a credere che la sorte dopo la morte dipenda da una partita.',art:'sun',en:{k:'Around 1500 BC',b:'Senet becomes a game for everyone. It also takes on a new meaning: people begin to believe that one\'s fate after death depends on a game.'}},
+ {k:'Il defunto e il Destino',b:'Una partita giocata dal defunto contro il Destino in persona. È il motivo per cui le tombe sono piene di giochi, immagini e spiegazioni di partite.',en:{k:'The deceased and Fate',b:'A game played by the deceased against Fate in person. This is why tombs are full of games, images and explanations of games.'}},
+ {k:'Tutankhamon',b:'Nella sua tomba sono stati ritrovati tavoli da gioco in legno e avorio, con i cassetti per le pedine sotto la tavola.',art:'board',en:{k:'Tutankhamun',b:'His tomb held gaming boards of wood and ivory, with drawers for the pieces beneath the board.'}},
+ {k:'Geroglifici',b:'Figure di giocatori di senet compaiono anche nei geroglifici che raccontano la vita quotidiana e il passaggio dalla vita alla morte.',en:{k:'Hieroglyphs',b:'Figures of senet players also appear in hieroglyphs describing daily life and the passage from life to death.'}},
+ {k:'I legnetti',b:'Si lanciavano quattro legnetti a mezzo cilindro: convessi e neri da un lato, piani e bianchi dall\'altro. Il punteggio era il numero di facce bianche.',art:'sticks',en:{k:'The casting sticks',b:'Four half-cylinder sticks were thrown: convex and black on one side, flat and white on the other. The score was the number of white faces.'}},
+ {k:'Il viaggio',b:'Trenta caselle in tre file. Le ultime cinque hanno un significato speciale: la rinascita, l\'abbondanza, la malasorte, le tre verità, Horus, Ra.',art:'water',en:{k:'The journey',b:'Thirty squares in three rows. The last five have a special meaning: rebirth, abundance, misfortune, the three truths, Horus, Ra.'}},
+ {k:'Regole perdute',b:'Nessuna copia integrale delle regole è arrivata fino a noi. Studiosi come Timothy Kendall e R.C. Bell le hanno ricostruite: oggi esistono molte varianti.',en:{k:'Lost rules',b:'No complete copy of the rules has survived. Scholars such as Timothy Kendall and R.C. Bell have reconstructed them: many variants exist today.'}},
+ {k:'Fino alla fine',b:'In epoca antica forse entrambi i giocatori dovevano concludere la partita. Chi era uscito per primo non abbandonava l\'altro: lo assisteva fino alla meta.',en:{k:'To the very end',b:'In antiquity both players may have had to finish the game. The one who had borne off first did not abandon the other, but assisted them to the goal.'}},
+ {k:'Nella cultura di massa',b:'Il senet compare nel videogioco «Egypt 1156 a.C.: l\'enigma della tomba reale» (Cryo Interactive, 1997), in «Tomb Raider: The Last Revelation» (1999) e nella serie «Lost», come passatempo del giovane Jacob e di suo fratello.',en:{k:'In popular culture',b:'Senet appears in the video game «Egypt 1156 B.C.: Tomb of the Pharaoh» (Cryo Interactive, 1997), in «Tomb Raider: The Last Revelation» (1999) and in the series «Lost», as a pastime of the young Jacob and his brother.'}},
+ {t:'Tocca a te',b:'Trenta caselle, cinque o sette pedine. Porta tutto nell\'aldilà.',art:'ankh',en:{t:'Your turn',b:'Thirty squares, five or seven pieces. Bear them all off to the afterlife.'}},
+ {k:'Fonti',b:'Voce «Senet», Wikipedia, e regole di Timothy Kendall e R.C. Bell nell\'adattamento UniNerd.',small:true,en:{k:'Sources',b:'The «Senet» entry on Wikipedia, and the rules of Timothy Kendall and R.C. Bell as adapted by UniNerd.'}}
 ];
 function artSVG(a){
   const gold='#c9a860';
@@ -1282,11 +1334,12 @@ function artSVG(a){
 const Story=(function(){
   const el=$('#story'),card=$('#stCard'),cv=$('#stCv'),cx=cv.getContext('2d');
   const FI=1600,FO=1400,dur=c=>5200+c.b.length*50;
+  const curCard=n=>{const c=STORY[n];return LANG==='en'&&c.en?Object.assign({},c,c.en):c;};
   const total=STORY.reduce((a,c)=>a+dur(c),0);
   let i=0,tt=0,paused=false,running=false,last=0,raf=0,parts=[],opener=null;
   const sm=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
   function show(n){
-    i=n;tt=0; const c=STORY[i];
+    i=n;tt=0; const c=curCard(i);
     $('#stArt').innerHTML=c.art?artSVG(c.art):''; $('#stKick').textContent=c.k||''; $('#stTitle').textContent=c.t||''; $('#stBody').textContent=c.b||'';
     card.classList.toggle('small',!!c.small); card.style.opacity='0'; $('#stEnd').classList.remove('on');
   }
@@ -1315,15 +1368,15 @@ const Story=(function(){
   async function lock(){ try{ if('wakeLock' in navigator&&!wl&&!document.hidden){ const l=await navigator.wakeLock.request('screen'); if(!running||$('#stEnd').classList.contains('on')){l.release();return;} wl=l; l.addEventListener('release',()=>{if(wl===l)wl=null;}); } }catch(e){} }
   function unlock(){ try{ if(wl){const l=wl;wl=null;l.release();} }catch(e){} }
   document.addEventListener('visibilitychange',()=>{ if(running&&!document.hidden&&!$('#stEnd').classList.contains('on'))lock(); });
-  function end(){ unlock(); card.style.opacity='0'; $('#stEnd').classList.add('on'); $('#stProg').style.width='100%'; paused=true; $('#stPause').textContent='Pausa'; $('#stAgain').focus(); }
+  function end(){ unlock(); card.style.opacity='0'; $('#stEnd').classList.add('on'); $('#stProg').style.width='100%'; paused=true; $('#stPause').textContent=_('Pausa','Pause'); $('#stAgain').focus(); }
   function open(){
     opener=document.activeElement; el.hidden=false; document.body.style.overflow='hidden';
-    AU.unlock(); resize(); mkParts(); paused=false; $('#stPause').textContent='Pausa'; syncStMus(); show(0);
+    AU.unlock(); resize(); mkParts(); paused=false; $('#stPause').textContent=_('Pausa','Pause'); syncStMus(); show(0);
     running=true; last=performance.now(); raf=requestAnimationFrame(frame); $('#stPause').focus(); lock();
   }
   function close(){ running=false; unlock(); cancelAnimationFrame(raf); el.hidden=true; document.body.style.overflow=''; if(opener&&opener.focus)opener.focus(); }
-  function pause(){ if($('#stEnd').classList.contains('on'))return; paused=!paused; $('#stPause').textContent=paused?'Riprendi':'Pausa'; }
-  function go(n){ paused=false; if(running)lock(); $('#stPause').textContent='Pausa'; show(Math.max(0,Math.min(STORY.length-1,n))); }
+  function pause(){ if($('#stEnd').classList.contains('on'))return; paused=!paused; $('#stPause').textContent=paused?_('Riprendi','Resume'):_('Pausa','Pause'); }
+  function go(n){ paused=false; if(running)lock(); $('#stPause').textContent=_('Pausa','Pause'); show(Math.max(0,Math.min(STORY.length-1,n))); }
   addEventListener('resize',()=>{if(running){resize();mkParts();}});
   document.addEventListener('keydown',e=>{
     if(el.hidden)return;
@@ -1338,11 +1391,13 @@ const Story=(function(){
   $('#stClose').addEventListener('click',close);
   $('#stBack').addEventListener('click',close);
   $('#stAgain').addEventListener('click',()=>go(0));
-  return {open,close};
+  function refresh(){ if(!running)return; const c=curCard(i); $('#stKick').textContent=c.k||''; $('#stTitle').textContent=c.t||''; $('#stBody').textContent=c.b||''; $('#stPause').textContent=paused?_('Riprendi','Resume'):_('Pausa','Pause'); }
+  return {open,close,refresh};
 })();
-function syncStMus(){ $('#stMus').textContent='Colonna sonora: '+(AU.S.mus?'sì':'no'); $('#optMusic').checked=AU.S.mus; }
+function syncStMus(){ $('#stMus').textContent=_('Colonna sonora: ','Soundtrack: ')+(AU.S.mus?_('sì','on'):_('no','off')); $('#optMusic').checked=AU.S.mus; }
 $('#stMus').addEventListener('click',()=>{AU.setMus(!AU.S.mus);syncStMus();});
 $('#storyBtn').addEventListener('click',()=>Story.open());
+langHooks.push(()=>{Story.refresh();syncStMus();});
 syncStMus();
 
 /* ===== Regole illustrate ===== */
@@ -1355,76 +1410,76 @@ function diceTable(rows){
   return '<div class="dt">'+rows.map(r=>'<div class="dtr"><div class="dtd">'+r.icon+'</div><div class="dtv">'+r.big+'</div><div class="dtt"><b>'+r.t+'</b>'+(r.s?'<span>'+r.s+'</span>':'')+'</div>'
     +'<div class="dtp"><span class="bar"><i style="width:'+r.bar+'%"></i></span><span>'+r.pt+'</span></div></div>').join('')+'</div>';
 }
-const KROWS=[[1,'Muovi di 1 e rilancia','una faccia bianca',4],[2,'Muovi di 2 e passa la mano','due facce bianche',6],[3,'Muovi di 3 e passa la mano','tre facce bianche',4],[4,'Muovi di 4 e rilancia','quattro facce bianche',1],[6,'Muovi di 6 e rilancia','nessuna faccia bianca',1]]
-  .map(a=>({icon:stkH([0,1,2,3].map(i=>i<(a[0]===6?0:a[0]))),big:String(a[0]),t:a[1],s:a[2],pt:a[3]+' volte su 16',bar:a[3]/6*100}));
-const UROWS=[[1,'Muovi di 1 e rilancia'],[2,'Muovi di 2 e passa la mano'],[3,'Muovi di 3 e passa la mano'],[4,'Muovi di 4 e rilancia'],[5,'Muovi di 5 e rilancia'],[6,'X: si passa senza muovere']]
-  .map(a=>({icon:dieH(a[0]),big:a[0]===6?'X':String(a[0]),t:a[1],s:a[0]===6?'vale meno di qualsiasi altro tiro':'',pt:'1 volta su 6',bar:100}));
+const KROWS=()=>[[1,_('Muovi di 1 e rilancia','Move 1 and throw again'),_('una faccia bianca','one white face'),4],[2,_('Muovi di 2 e passa la mano','Move 2 and pass the turn'),_('due facce bianche','two white faces'),6],[3,_('Muovi di 3 e passa la mano','Move 3 and pass the turn'),_('tre facce bianche','three white faces'),4],[4,_('Muovi di 4 e rilancia','Move 4 and throw again'),_('quattro facce bianche','four white faces'),1],[6,_('Muovi di 6 e rilancia','Move 6 and throw again'),_('nessuna faccia bianca','no white faces'),1]]
+  .map(a=>({icon:stkH([0,1,2,3].map(i=>i<(a[0]===6?0:a[0]))),big:String(a[0]),t:a[1],s:a[2],pt:a[3]+_(' volte su 16',' in 16'),bar:a[3]/6*100}));
+const UROWS=()=>[[1,_('Muovi di 1 e rilancia','Move 1 and throw again')],[2,_('Muovi di 2 e passa la mano','Move 2 and pass the turn')],[3,_('Muovi di 3 e passa la mano','Move 3 and pass the turn')],[4,_('Muovi di 4 e rilancia','Move 4 and throw again')],[5,_('Muovi di 5 e rilancia','Move 5 and throw again')],[6,_('X: si passa senza muovere','X: the turn passes without moving')]]
+  .map(a=>({icon:dieH(a[0]),big:a[0]===6?'X':String(a[0]),t:a[1],s:a[0]===6?_('vale meno di qualsiasi altro tiro','ranks below any other throw'):'',pt:_('1 volta su 6','1 in 6'),bar:100}));
 
 function slides(U){
-  const n=U?5:7, ev=[], od=[];
+  const n=U?5:7, ev=[], od=[], N0=_('Avorio','Ivory'), N1=_('Ebano','Ebony');
   for(let i=1;i<=n;i++){ev.push(2*i);od.push(2*i-1);}
-  const RC=(v)=>chipH('Tiro <b>'+(U?'dado '+v:(v===6?'0 facce bianche · 6':v+(v===1?' faccia bianca · ':' facce bianche · ')+v))+'</b>');
+  const RC=(v)=>chipH(_('Tiro','Throw')+' <b>'+(U?_('dado ','die ')+v:(v===6?_('0 facce bianche · 6','0 white faces · 6'):v+(v===1?_(' faccia bianca · ',' white face · '):_(' facce bianche · ',' white faces · '))+v))+'</b>');
   const A=(seq,o,k,dy)=>({o:o||0,seq,k,dy});
   const sc=(o)=>Object.assign({type:'board'},o);
   const L=[];
-  L.push({t:'Il tavoliere',p:[
-    'Il tavoliere ha <b>30 caselle</b> in tre file da dieci. Il percorso è a serpentina: la prima fila va da sinistra a destra (1-10), la seconda da destra a sinistra (11-20), la terza da sinistra a destra (21-30).',
-    'Le ultime cinque caselle hanno disegni e regole speciali: 15 (ankh), 26, 27 (acqua), 28, 29 (occhio di Horus) e 30 (disco solare).'],
-    sc:sc({arrows:[A(rg(1,10)),A(rg(11,20)),A(rg(21,30))],chips:[chipH('Percorso a serpentina: dalla 1 alla 30'),chipH('Caselle speciali: 15, 26, 27, 28, 29, 30')]})});
-  L.push({t:'Disposizione iniziale',p:[
-    'Ogni giocatore ha '+(U?'<b>cinque</b>':'<b>sette</b>')+' pedine ('+(U?'le regole di Kendall e Bell ne prevedono 5; si può scegliere anche 7':'le regole CEMEA ne prevedono 7; si può scegliere anche 5')+'). Le pedine partono <b>alternate</b> sulle prime caselle: '+(U?'dalla 1 alla 10':'dalla 1 alla 14')+'.',
-    'Chi comincia occupa le caselle <b>pari</b>, l\'altro le dispari. Qui comincia Avorio.'],
-    sc:sc({b:ev,r:od,chips:[chipH('Avorio: caselle pari'),chipH('Ebano: caselle dispari')]})});
-  L.push({t:U?'Il dado':'I quattro legnetti',p:U
-    ?['Si usa un dado a sei facce con segni da 1 a 5 e una X. La <b>X</b> vale meno di tutti e non fa muovere.','I punteggi <b>1, 4 e 5</b> permettono di muovere e di <b>rilanciare</b>. Con <b>2 e 3</b> si muove e passa la mano.']
-    :['Si lanciano quattro legnetti a mezzo cilindro: la parte convessa è nera, quella piana bianca. Il punteggio è il numero di <b>facce bianche</b>; se sono tutte nere vale <b>6</b>.','Con <b>1, 4 e 6</b> si muove e si <b>rilancia</b>. Con <b>2 e 3</b> si muove e si passa la mano. Con dado a sei facce si ammette anche il 5.'],
-    sc:{type:'dice',rows:U?UROWS:KROWS}});
-  L.push({t:'Chi comincia',p:U
-    ?['Ogni giocatore lancia il dado e comincia chi ottiene il punteggio più alto (la X vale meno di tutti). In caso di parità si ripete.','Chi comincia occupa le caselle pari e la <b>prima mossa spetta alla pedina in casella 10</b>, la più avanzata.']
-    :['I giocatori lanciano a turno i legnetti finché uno ottiene 1. Chi ci riesce comincia, e occupa le caselle pari.','Altre versioni assegnano la prima mossa a chi ottiene il punteggio più alto.'],
-    sc:sc({b:ev,r:od,chips:U?[RC(4),chipH('Ebano <b>dado 2</b>','res'),resc('Comincia Avorio','win')]:[chipH('Ebano <b>3</b>'),chipH('Avorio <b>2</b>'),chipH('Ebano <b>1</b>'),resc('Comincia Ebano','win')]})});
-  L.push({t:'Muovere una pedina',p:['Si sceglie una pedina e la si fa <b>avanzare</b> esattamente del punteggio ottenuto, saltando le altre pedine. Qui Avorio muove di 3.','Con 2 e 3 il turno passa all\'avversario.'],
-    sc:sc({b:[5],r:[11],roll:RC(3),arrows:[A([5,6,7,8])],marks:[{o:0,sq:8,k:'ok'}],after:{b0:8},res:[resc('Il turno passa')]})});
-  L.push({t:'Rilanciare',p:['Con '+(U?'1, 4 o 5':'1, 4 o 6')+' si muove una pedina e si <b>lancia ancora</b>, anche più volte di seguito. Qui Avorio muove di 4 e rilancia.'],
-    sc:sc({b:[5],r:[11],roll:RC(4),arrows:[A([5,6,7,8,9])],marks:[{o:0,sq:9,k:'ok'}],after:{b0:9},res:[resc('Avorio rilancia','win')]})});
-  L.push({t:'Attaccare',p:['Se il movimento termina su una pedina avversaria si <b>attacca</b>: le due pedine si scambiano di posto. L\'avversaria retrocede fino alla casella da cui è partita l\'attaccante.'],
-    sc:sc({b:[5],r:[8],roll:RC(3),arrows:[A([5,6,7,8])],marks:[{o:0,sq:8,k:'cap'}],after:{b0:8,r0:5},res:[resc('Le pedine si scambiano di posto')]})});
-  L.push({t:'Il muro di due pedine',p:['Due pedine dello stesso colore in <b>caselle contigue</b> formano un muro: non possono essere attaccate, ma si possono <b>superare</b>.','Qui Avorio non può fermarsi sull\'8, ma con un 4 supera il muro e arriva in 9.'],
-    sc:sc({b:[5],r:[7,8],roll:RC(4),arrows:[A([5,6,7,8,9])],marks:[{o:0,sq:8,k:'no'},{o:0,sq:9,k:'ok'}],after:{b0:9},chips:[noc('Attaccare una pedina del muro'),okc('Superarlo')]})});
-  L.push({t:'Il muro di tre pedine',p:['Tre pedine dello stesso colore in tre caselle consecutive formano un <b>muro invalicabile</b>: non si può né attaccarlo né superarlo.','Qui Avorio con un 4 dovrebbe oltrepassare le caselle 6-8: la mossa non è consentita.'],
-    sc:sc({b:[5],r:[6,7,8],roll:RC(4),marks:[{o:0,sq:9,k:'no'}],arrows:[A([5,6,7,8,9],0,'k')],chips:[noc('5 → 9: muro invalicabile')]})});
-  L.push({t:'Non su una propria pedina',p:['Due pedine dello stesso colore non possono occupare la stessa casella: la mossa che termina su una propria pedina non si può fare.','Qui la pedina in 4 non può muovere di 3 (finirebbe sulla 7), ma l\'altra sì.'],
+  L.push({t:_('Il tavoliere','The board'),p:[
+    _('Il tavoliere ha <b>30 caselle</b> in tre file da dieci. Il percorso è a serpentina: la prima fila va da sinistra a destra (1-10), la seconda da destra a sinistra (11-20), la terza da sinistra a destra (21-30).','The board has <b>30 squares</b> in three rows of ten. The path is serpentine: the first row runs left to right (1-10), the second right to left (11-20), the third left to right (21-30).'),
+    _('Le ultime cinque caselle hanno disegni e regole speciali: 15 (ankh), 26, 27 (acqua), 28, 29 (occhio di Horus) e 30 (disco solare).','The last five squares have special designs and rules: 15 (ankh), 26, 27 (water), 28, 29 (eye of Horus) and 30 (sun disc).')],
+    sc:sc({arrows:[A(rg(1,10)),A(rg(11,20)),A(rg(21,30))],chips:[chipH(_('Percorso a serpentina: dalla 1 alla 30','Serpentine path: from 1 to 30')),chipH(_('Caselle speciali: 15, 26, 27, 28, 29, 30','Special squares: 15, 26, 27, 28, 29, 30'))]})});
+  L.push({t:_('Disposizione iniziale','Initial setup'),p:[
+    _('Ogni giocatore ha ','Each player has ')+(U?_('<b>cinque</b>','<b>five</b>'):_('<b>sette</b>','<b>seven</b>'))+_(' pedine (',' pieces (')+(U?_('le regole di Kendall e Bell ne prevedono 5; si può scegliere anche 7','the Kendall and Bell rules provide for 5; 7 can also be chosen'):_('le regole CEMEA ne prevedono 7; si può scegliere anche 5','the CEMEA rules provide for 7; 5 can also be chosen'))+_('). Le pedine partono <b>alternate</b> sulle prime caselle: ','). The pieces start <b>alternating</b> on the first squares: ')+(U?_('dalla 1 alla 10','from 1 to 10'):_('dalla 1 alla 14','from 1 to 14'))+'.',
+    _('Chi comincia occupa le caselle <b>pari</b>, l\'altro le dispari. Qui comincia Avorio.','The player who starts occupies the <b>even</b> squares, the other the odd ones. Here Ivory starts.')],
+    sc:sc({b:ev,r:od,chips:[chipH(N0+_(': caselle pari',': even squares')),chipH(N1+_(': caselle dispari',': odd squares'))]})});
+  L.push({t:U?_('Il dado','The die'):_('I quattro legnetti','The four casting sticks'),p:U
+    ?[_('Si usa un dado a sei facce con segni da 1 a 5 e una X. La <b>X</b> vale meno di tutti e non fa muovere.','A six-sided die is used, with marks from 1 to 5 and an X. The <b>X</b> ranks lowest and does not allow a move.'),_('I punteggi <b>1, 4 e 5</b> permettono di muovere e di <b>rilanciare</b>. Con <b>2 e 3</b> si muove e passa la mano.','Scores <b>1, 4 and 5</b> allow a move and a <b>further throw</b>. With <b>2 and 3</b> the player moves and passes the turn.')]
+    :[_('Si lanciano quattro legnetti a mezzo cilindro: la parte convessa è nera, quella piana bianca. Il punteggio è il numero di <b>facce bianche</b>; se sono tutte nere vale <b>6</b>.','Four half-cylinder casting sticks are thrown: the convex side is black, the flat side white. The score is the number of <b>white faces</b>; if all are black it counts <b>6</b>.'),_('Con <b>1, 4 e 6</b> si muove e si <b>rilancia</b>. Con <b>2 e 3</b> si muove e si passa la mano. Con dado a sei facce si ammette anche il 5.','With <b>1, 4 and 6</b> the player moves and <b>throws again</b>. With <b>2 and 3</b> the player moves and passes the turn. With a six-sided die, 5 is also allowed.')],
+    sc:{type:'dice',rows:U?UROWS():KROWS()}});
+  L.push({t:_('Chi comincia','Who starts'),p:U
+    ?[_('Ogni giocatore lancia il dado e comincia chi ottiene il punteggio più alto (la X vale meno di tutti). In caso di parità si ripete.','Each player throws the die and the one with the highest score starts (X ranks lowest). A tie is thrown again.'),_('Chi comincia occupa le caselle pari e la <b>prima mossa spetta alla pedina in casella 10</b>, la più avanzata.','The starting player occupies the even squares and the <b>first move belongs to the piece on square 10</b>, the most advanced.')]
+    :[_('I giocatori lanciano a turno i legnetti finché uno ottiene 1. Chi ci riesce comincia, e occupa le caselle pari.','Players throw the sticks in turn until one gets 1. That player starts and occupies the even squares.'),_('Altre versioni assegnano la prima mossa a chi ottiene il punteggio più alto.','Other versions give the first move to the player with the highest score.')],
+    sc:sc({b:ev,r:od,chips:U?[RC(4),chipH(N1+' <b>'+_('dado ','die ')+'2</b>','res'),resc(_('Comincia ','')+N0+_('',' starts'),'win')]:[chipH(N1+' <b>3</b>'),chipH(N0+' <b>2</b>'),chipH(N1+' <b>1</b>'),resc(_('Comincia ','')+N1+_('',' starts'),'win')]})});
+  L.push({t:_('Muovere una pedina','Moving a piece'),p:[_('Si sceglie una pedina e la si fa <b>avanzare</b> esattamente del punteggio ottenuto, saltando le altre pedine. Qui Avorio muove di 3.','Choose a piece and <b>advance</b> it exactly the number of squares scored, jumping over other pieces. Here Ivory moves 3.'),_('Con 2 e 3 il turno passa all\'avversario.','With 2 and 3 the turn passes to the opponent.')],
+    sc:sc({b:[5],r:[11],roll:RC(3),arrows:[A([5,6,7,8])],marks:[{o:0,sq:8,k:'ok'}],after:{b0:8},res:[resc(_('Il turno passa','The turn passes'))]})});
+  L.push({t:_('Rilanciare','Throwing again'),p:[_('Con ','With ')+(U?_('1, 4 o 5','1, 4 or 5'):_('1, 4 o 6','1, 4 or 6'))+_(' si muove una pedina e si <b>lancia ancora</b>, anche più volte di seguito. Qui Avorio muove di 4 e rilancia.',' a piece is moved and the player <b>throws again</b>, even several times in a row. Here Ivory moves 4 and throws again.')],
+    sc:sc({b:[5],r:[11],roll:RC(4),arrows:[A([5,6,7,8,9])],marks:[{o:0,sq:9,k:'ok'}],after:{b0:9},res:[resc(N0+_(' rilancia',' throws again'),'win')]})});
+  L.push({t:_('Attaccare','Attacking'),p:[_('Se il movimento termina su una pedina avversaria si <b>attacca</b>: le due pedine si scambiano di posto. L\'avversaria retrocede fino alla casella da cui è partita l\'attaccante.','If the move ends on an opposing piece, the player <b>attacks</b>: the two pieces swap places. The attacked piece goes back to the square the attacker started from.')],
+    sc:sc({b:[5],r:[8],roll:RC(3),arrows:[A([5,6,7,8])],marks:[{o:0,sq:8,k:'cap'}],after:{b0:8,r0:5},res:[resc(_('Le pedine si scambiano di posto','The pieces swap places'))]})});
+  L.push({t:_('Il muro di due pedine','The wall of two pieces'),p:[_('Due pedine dello stesso colore in <b>caselle contigue</b> formano un muro: non possono essere attaccate, ma si possono <b>superare</b>.','Two pieces of the same colour on <b>adjacent squares</b> form a wall: they cannot be attacked, but they can be <b>passed</b>.'),_('Qui Avorio non può fermarsi sull\'8, ma con un 4 supera il muro e arriva in 9.','Here Ivory cannot stop on 8, but with a 4 passes the wall and reaches 9.')],
+    sc:sc({b:[5],r:[7,8],roll:RC(4),arrows:[A([5,6,7,8,9])],marks:[{o:0,sq:8,k:'no'},{o:0,sq:9,k:'ok'}],after:{b0:9},chips:[noc(_('Attaccare una pedina del muro','Attacking a piece of the wall')),okc(_('Superarlo','Passing it'))]})});
+  L.push({t:_('Il muro di tre pedine','The wall of three pieces'),p:[_('Tre pedine dello stesso colore in tre caselle consecutive formano un <b>muro invalicabile</b>: non si può né attaccarlo né superarlo.','Three pieces of the same colour on three consecutive squares form an <b>impassable wall</b>: it can be neither attacked nor passed.'),_('Qui Avorio con un 4 dovrebbe oltrepassare le caselle 6-8: la mossa non è consentita.','Here Ivory, with a 4, would have to pass squares 6-8: the move is not allowed.')],
+    sc:sc({b:[5],r:[6,7,8],roll:RC(4),marks:[{o:0,sq:9,k:'no'}],arrows:[A([5,6,7,8,9],0,'k')],chips:[noc(_('5 → 9: muro invalicabile','5 → 9: impassable wall'))]})});
+  L.push({t:_('Non su una propria pedina','Not onto your own piece'),p:[_('Due pedine dello stesso colore non possono occupare la stessa casella: la mossa che termina su una propria pedina non si può fare.','Two pieces of the same colour cannot occupy the same square: a move ending on one of your own pieces cannot be made.'),_('Qui la pedina in 4 non può muovere di 3 (finirebbe sulla 7), ma l\'altra sì.','Here the piece on 4 cannot move 3 (it would end on 7), but the other one can.')],
     sc:sc({b:[4,7],roll:RC(3),marks:[{o:0,sq:7,k:'no'},{o:0,sq:10,k:'ok'}],arrows:[A([7,8,9,10])],after:{b1:10},chips:[noc('4 → 7'),okc('7 → 10')]})});
-  L.push({t:'Tiro nullo: si retrocede',p:['Se nessuna pedina può avanzare di quanto indicato dal punteggio, il giocatore <b>fa retrocedere</b> una pedina a sua scelta del numero di caselle ottenuto (su una casella libera).','Se neppure questo è possibile, passa il turno.'],
-    sc:sc({b:[9],r:[10,11,12],roll:RC(4),arrows:[A([9,8,7,6,5],0,'k')],after:{b0:5},res:[resc('La pedina retrocede di 4')]})});
-  L.push({t:'La casa della rinascita',p:['La casella <b>15</b> (ankh) è la casa della rinascita: la pedina che la occupa <b>non può essere attaccata</b>. Lo stesso vale per la 26, la 28, la 29 e la 30.'],
-    sc:sc({b:[12],r:[15],roll:RC(3),arrows:[A([12,13,14,15],0,'k')],marks:[{o:0,sq:15,k:'no'}],chips:[noc('Attaccare una pedina in 15')]})});
-  L.push({t:'La casa dell\'abbondanza',p:['La casella <b>26</b> è di buon augurio e protegge la pedina. Dalla 26 un <b>1</b> sposterebbe in 27, la casa della malasorte: con un 1 la pedina può invece <b>saltarla</b> e arrivare in 28.','(Le fonti non precisano il salto: qui è interpretato come passaggio 26 → 28.)'],
-    sc:sc({b:[26],roll:RC(1),arrows:[A([26,28])],marks:[{o:0,sq:27,k:'no'},{o:0,sq:28,k:'ok'}],after:{b0:28},chips:[noc('26 → 27'),okc('26 → 28 (salto)')]})});
-  L.push({t:'La casa della malasorte',p:['Una pedina che termina in <b>27</b> (acqua) deve tornare indietro fino alla casa della rinascita, la <b>15</b>.','Passare sopra la 27 senza fermarsi non ha alcun effetto.'],
-    sc:sc({b:[24,9],roll:RC(3),arrows:[A([24,25,26,27]),A([27,15],0,'k')],marks:[{o:0,sq:27,k:'no'},{o:0,sq:15,k:'ok'}],after:{b0:15},res:[resc('La pedina torna in 15')]})});
-  L.push({t:'La 15 è occupata',p:['Se la casa della rinascita è occupata da una pedina avversaria, la pedina resta in 27 e il giocatore rimane <b>bloccato con tutte le sue pedine</b> finché non ottiene <b>4</b>.','(Se la 15 è occupata da una propria pedina, la pedina riparte dalla prima casella libera.)'],
-    sc:sc({b:[24,9],r:[15],roll:RC(3),arrows:[A([24,25,26,27])],marks:[{o:0,sq:27,k:'no'}],after:{b0:27},res:[resc('Avorio è bloccato')]})});
-  L.push({t:'Bloccato: serve un 4',p:['Con il 4 la pedina bloccata <b>esce dal gioco</b>, e il giocatore lancia ancora. Con qualsiasi altro punteggio il turno passa senza muovere nulla, nemmeno all\'indietro.'],
-    sc:sc({b:[27,9],r:[15],ro:0,roll:RC(4),arrows:[A([27,28,29,30,'X'])],after:{b0:31},res:[resc('La pedina esce dal gioco'),resc('Avorio rilancia','win')]})});
-  L.push({t:'Le caselle 28, 29 e 30',p:['Le ultime tre caselle sono rifugi: le pedine non possono essere attaccate. I segni <b>III, II, I</b> indicano il punteggio <b>esatto</b> con cui si esce: 3 dalla 28, 2 dalla 29, 1 dalla 30.','Qui la pedina in 28 esce con un 3.'],
-    sc:sc({b:[28],r:[23],roll:RC(3),arrows:[A([28,29,30,'X'])],after:{b0:31},chips:[chipH('28 · III → 3'),chipH('29 · II → 2'),chipH('30 · I → 1')],res:[resc('La pedina esce dal tavoliere')]})});
-  if(U)L.push({t:'Uscita dalla 30 a inizio turno',p:['Nelle regole di Kendall e Bell, <b>all\'inizio di un nuovo turno</b> la pedina in casella 30 può uscire senza lanciare, ma solo se il giocatore non ha altre pedine nella <b>prima fila</b> (caselle 1-10).','Poi il giocatore lancia normalmente.'],
-    sc:sc({b:[30,16],r:[4],arrows:[A([30,'X'])],after:{b0:31},chips:[okc('Nessuna pedina nelle caselle 1-10')],res:[resc('Esce prima del lancio')]})});
-  L.push({t:'Vittoria',p:['Vince chi per primo porta <b>tutte le proprie pedine</b> fuori dal tavoliere.','Secondo le fonti, in epoca antica entrambi i giocatori dovevano comunque concludere: chi era uscito per primo assisteva l\'altro fino alla meta. Questa regola non è implementata.'],
-    sc:sc({b:[30],bo:n-1,r:[22,14],roll:RC(1),arrows:[A([30,'X'])],after:{b0:31},res:[resc('Avorio vince','win')]})});
-  L.push({t:'Il turno in sintesi',p:['Ecco la sequenza di un turno.'],
+  L.push({t:_('Tiro nullo: si retrocede','Null throw: moving back'),p:[_('Se nessuna pedina può avanzare di quanto indicato dal punteggio, il giocatore <b>fa retrocedere</b> una pedina a sua scelta del numero di caselle ottenuto (su una casella libera).','If no piece can advance by the score, the player <b>moves back</b> a piece of their choice by the number of squares scored (onto a free square).'),_('Se neppure questo è possibile, passa il turno.','If even that is not possible, the turn passes.')],
+    sc:sc({b:[9],r:[10,11,12],roll:RC(4),arrows:[A([9,8,7,6,5],0,'k')],after:{b0:5},res:[resc(_('La pedina retrocede di 4','The piece moves back 4'))]})});
+  L.push({t:_('La casa della rinascita','The House of Rebirth'),p:[_('La casella <b>15</b> (ankh) è la casa della rinascita: la pedina che la occupa <b>non può essere attaccata</b>. Lo stesso vale per la 26, la 28, la 29 e la 30.','Square <b>15</b> (ankh) is the House of Rebirth: a piece on it <b>cannot be attacked</b>. The same holds for 26, 28, 29 and 30.')],
+    sc:sc({b:[12],r:[15],roll:RC(3),arrows:[A([12,13,14,15],0,'k')],marks:[{o:0,sq:15,k:'no'}],chips:[noc(_('Attaccare una pedina in 15','Attacking a piece on 15'))]})});
+  L.push({t:_('La casa dell\'abbondanza','The House of Abundance'),p:[_('La casella <b>26</b> è di buon augurio e protegge la pedina. Dalla 26 un <b>1</b> sposterebbe in 27, la casa della malasorte: con un 1 la pedina può invece <b>saltarla</b> e arrivare in 28.','Square <b>26</b> is auspicious and protects the piece. From 26, a <b>1</b> would move to 27, the House of Misfortune: with a 1 the piece can instead <b>skip</b> it and reach 28.'),_('(Le fonti non precisano il salto: qui è interpretato come passaggio 26 → 28.)','(The sources do not specify the skip: here it is interpreted as a passage 26 → 28.)')],
+    sc:sc({b:[26],roll:RC(1),arrows:[A([26,28])],marks:[{o:0,sq:27,k:'no'},{o:0,sq:28,k:'ok'}],after:{b0:28},chips:[noc('26 → 27'),okc(_('26 → 28 (salto)','26 → 28 (skip)'))]})});
+  L.push({t:_('La casa della malasorte','The House of Misfortune'),p:[_('Una pedina che termina in <b>27</b> (acqua) deve tornare indietro fino alla casa della rinascita, la <b>15</b>.','A piece that ends on <b>27</b> (water) must go back to the House of Rebirth, <b>15</b>.'),_('Passare sopra la 27 senza fermarsi non ha alcun effetto.','Passing over 27 without stopping has no effect.')],
+    sc:sc({b:[24,9],roll:RC(3),arrows:[A([24,25,26,27]),A([27,15],0,'k')],marks:[{o:0,sq:27,k:'no'},{o:0,sq:15,k:'ok'}],after:{b0:15},res:[resc(_('La pedina torna in 15','The piece returns to 15'))]})});
+  L.push({t:_('La 15 è occupata','15 is occupied'),p:[_('Se la casa della rinascita è occupata da una pedina avversaria, la pedina resta in 27 e il giocatore rimane <b>bloccato con tutte le sue pedine</b> finché non ottiene <b>4</b>.','If the House of Rebirth is occupied by an opposing piece, the piece stays on 27 and the player remains <b>blocked with all their pieces</b> until a <b>4</b> is thrown.'),_('(Se la 15 è occupata da una propria pedina, la pedina riparte dalla prima casella libera.)','(If 15 is occupied by one of the player\'s own pieces, the piece restarts from the first free square.)')],
+    sc:sc({b:[24,9],r:[15],roll:RC(3),arrows:[A([24,25,26,27])],marks:[{o:0,sq:27,k:'no'}],after:{b0:27},res:[resc(N0+_(' è bloccato',' is blocked'))]})});
+  L.push({t:_('Bloccato: serve un 4','Blocked: a 4 is needed'),p:[_('Con il 4 la pedina bloccata <b>esce dal gioco</b>, e il giocatore lancia ancora. Con qualsiasi altro punteggio il turno passa senza muovere nulla, nemmeno all\'indietro.','With a 4 the blocked piece <b>leaves the game</b>, and the player throws again. With any other score the turn passes without moving anything, not even backwards.')],
+    sc:sc({b:[27,9],r:[15],ro:0,roll:RC(4),arrows:[A([27,28,29,30,'X'])],after:{b0:31},res:[resc(_('La pedina esce dal gioco','The piece leaves the game')),resc(N0+_(' rilancia',' throws again'),'win')]})});
+  L.push({t:_('Le caselle 28, 29 e 30','Squares 28, 29 and 30'),p:[_('Le ultime tre caselle sono rifugi: le pedine non possono essere attaccate. I segni <b>III, II, I</b> indicano il punteggio <b>esatto</b> con cui si esce: 3 dalla 28, 2 dalla 29, 1 dalla 30.','The last three squares are refuges: pieces on them cannot be attacked. The marks <b>III, II, I</b> indicate the <b>exact</b> score needed to leave: 3 from 28, 2 from 29, 1 from 30.'),_('Qui la pedina in 28 esce con un 3.','Here the piece on 28 leaves with a 3.')],
+    sc:sc({b:[28],r:[23],roll:RC(3),arrows:[A([28,29,30,'X'])],after:{b0:31},chips:[chipH('28 · III → 3'),chipH('29 · II → 2'),chipH('30 · I → 1')],res:[resc(_('La pedina esce dal tavoliere','The piece leaves the board'))]})});
+  if(U)L.push({t:_('Uscita dalla 30 a inizio turno','Leaving from 30 at the start of a turn'),p:[_('Nelle regole di Kendall e Bell, <b>all\'inizio di un nuovo turno</b> la pedina in casella 30 può uscire senza lanciare, ma solo se il giocatore non ha altre pedine nella <b>prima fila</b> (caselle 1-10).','Under the Kendall and Bell rules, <b>at the start of a new turn</b> the piece on square 30 may leave without throwing, but only if the player has no other pieces in the <b>first row</b> (squares 1-10).'),_('Poi il giocatore lancia normalmente.','Then the player throws as usual.')],
+    sc:sc({b:[30,16],r:[4],arrows:[A([30,'X'])],after:{b0:31},chips:[okc(_('Nessuna pedina nelle caselle 1-10','No pieces on squares 1-10'))],res:[resc(_('Esce prima del lancio','Leaves before the throw'))]})});
+  L.push({t:_('Vittoria','Victory'),p:[_('Vince chi per primo porta <b>tutte le proprie pedine</b> fuori dal tavoliere.','The first player to bear <b>all their pieces</b> off the board wins.'),_('Secondo le fonti, in epoca antica entrambi i giocatori dovevano comunque concludere: chi era uscito per primo assisteva l\'altro fino alla meta. Questa regola non è implementata.','According to the sources, in antiquity both players had to finish anyway: the one who had left first assisted the other to the goal. This rule is not implemented.')],
+    sc:sc({b:[30],bo:n-1,r:[22,14],roll:RC(1),arrows:[A([30,'X'])],after:{b0:31},res:[resc(N0+_(' vince',' wins'),'win')]})});
+  L.push({t:_('Il turno in sintesi','The turn in brief'),p:[_('Ecco la sequenza di un turno.','Here is the sequence of a turn.')],
     sc:{type:'flow',steps:[
-     U?'Lancia il dado. Con la X il turno passa.':'Lancia i quattro legnetti e conta le facce bianche (nessuna: 6).',
-     'Muovi una pedina esattamente del punteggio, saltando le altre. Non fermarti su una tua pedina e non superare un muro di tre.',
-     'Se finisci su una pedina avversaria non protetta, scambiate le posizioni. Le pedine in 15, 26, 28, 29, 30 e nei muri di due non si attaccano.',
-     'Se nessuna pedina può avanzare, ne retrocedi una; se non è possibile, passa il turno.',
-     'Finire in 27 riporta in 15 (o blocca fino al 4 se la 15 è occupata dall\'avversario). Dalla 26, un 1 salta la 27.',
-     'Dalla 28 esci con 3, dalla 29 con 2, dalla 30 con 1'+(U?' (o a inizio turno, se non hai pedine nella prima fila)':'')+'.',
-     (U?'Con 1, 4 o 5':'Con 1, 4 o 6')+' rilanci, con 2 o 3 passi la mano. Vince chi porta fuori tutte le pedine.']}});
+     U?_('Lancia il dado. Con la X il turno passa.','Throw the die. With the X the turn passes.'):_('Lancia i quattro legnetti e conta le facce bianche (nessuna: 6).','Throw the four sticks and count the white faces (none: 6).'),
+     _('Muovi una pedina esattamente del punteggio, saltando le altre. Non fermarti su una tua pedina e non superare un muro di tre.','Move a piece exactly the score, jumping over others. Do not stop on one of your own pieces and do not pass a wall of three.'),
+     _('Se finisci su una pedina avversaria non protetta, scambiate le posizioni. Le pedine in 15, 26, 28, 29, 30 e nei muri di due non si attaccano.','If you end on an unprotected opposing piece, you swap places. Pieces on 15, 26, 28, 29, 30 and in walls of two cannot be attacked.'),
+     _('Se nessuna pedina può avanzare, ne retrocedi una; se non è possibile, passa il turno.','If no piece can advance, you move one back; if that is not possible, the turn passes.'),
+     _('Finire in 27 riporta in 15 (o blocca fino al 4 se la 15 è occupata dall\'avversario). Dalla 26, un 1 salta la 27.','Ending on 27 sends you back to 15 (or blocks you until a 4 if the opponent occupies 15). From 26, a 1 skips 27.'),
+     _('Dalla 28 esci con 3, dalla 29 con 2, dalla 30 con 1','You leave from 28 with a 3, from 29 with a 2, from 30 with a 1')+(U?_(' (o a inizio turno, se non hai pedine nella prima fila)',' (or at the start of the turn, if you have no pieces in the first row)'):'')+'.',
+     (U?_('Con 1, 4 o 5','With 1, 4 or 5'):_('Con 1, 4 o 6','With 1, 4 or 6'))+_(' rilanci, con 2 o 3 passi la mano. Vince chi porta fuori tutte le pedine.',' you throw again, with 2 or 3 you pass the turn. The first to bear all pieces off wins.')]}});
   return L;
 }
-const TUTS={kendall:slides(false),uninerd:slides(true)};
+let TUTS={kendall:slides(false),uninerd:slides(true)};
 
 let tutRules='kendall', tutI=0, tutS=null, tutTimer=0, tutOpener=null;
 const ARR_MK=['arrh0','arrh1'];
@@ -1473,7 +1528,7 @@ function tutScene(sc){
   });
   const before={}; pcs.forEach(pc=>before[pc.id]=pc.pos);
   const after=Object.assign({},before,sc.after||{});
-  fig.innerHTML='<svg class="tsvg" viewBox="0 0 10800 5160" role="img" aria-label="Scenario sul tavoliere"><g>'+BL.frame+BL.tiles+BL.glyphs+BL.nums+BL.lbls+'</g><g class="ta"></g><g class="tp"></g><g class="tm"></g></svg>'
+  fig.innerHTML='<svg class="tsvg" viewBox="0 0 10800 5160" role="img" aria-label="'+_('Scenario sul tavoliere','Scenario on the board')+'"><g>'+BL.frame+BL.tiles+BL.glyphs+BL.nums+lblsHTML()+'</g><g class="ta"></g><g class="tp"></g><g class="tm"></g></svg>'
     +'<div class="tut-chips">'+(sc.roll||'')+(sc.chips||[]).join('')+(sc.res||[]).join('')+'</div>';
   const svgEl=fig.querySelector('svg'), layer=fig.querySelector('.tp');
   pcs.forEach(pc=>{pc.el=pieceEl(pc.o);layer.appendChild(pc.el);});
@@ -1497,14 +1552,15 @@ function tutReplay(){
 }
 function tutRender(){
   const list=TUTS[tutRules], s=list[tutI];
-  $('#tutStep').textContent='Passo '+(tutI+1)+' di '+list.length+' · '+(tutRules==='kendall'?'regole CEMEA':'regole di Kendall e Bell');
+  $('#tutStep').textContent=_('Passo ','Step ')+(tutI+1)+_(' di ',' of ')+list.length+' · '+(tutRules==='kendall'?_('regole CEMEA','CEMEA rules'):_('regole di Kendall e Bell','Kendall and Bell rules'));
   $('#tutText').innerHTML='<h3>'+s.t+'</h3>'+s.p.map(x=>'<p>'+x+'</p>').join('');
   tutScene(s.sc);
   $('#tutPrev').disabled=tutI===0; $('#tutNext').disabled=tutI===list.length-1;
   $('#tutReplay').hidden=!s.sc.after;
-  $('#tutDots').innerHTML=list.map((x,i)=>'<button type="button" data-i="'+i+'" aria-label="Passo '+(i+1)+': '+x.t+'"'+(i===tutI?' aria-current="true"':'')+'></button>').join('');
+  $('#tutDots').innerHTML=list.map((x,i)=>'<button type="button" data-i="'+i+'" aria-label="'+_('Passo ','Step ')+(i+1)+': '+x.t+'"'+(i===tutI?' aria-current="true"':'')+'></button>').join('');
   $('.tut-body').scrollTop=0;
 }
+langHooks.push(()=>{TUTS={kendall:slides(false),uninerd:slides(true)}; if(!$('#tut').hidden)tutRender();});
 function tutGo(i){const n=TUTS[tutRules].length; tutI=Math.max(0,Math.min(n-1,i)); tutRender();}
 function openTut(){
   tutOpener=document.activeElement; tutRules=$('#opts').rules.value; tutI=0;
@@ -1540,5 +1596,6 @@ startGame();
 })();
 
 </script>
+
 </body>
 </html>

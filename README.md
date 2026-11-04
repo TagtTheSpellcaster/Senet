@@ -1,16 +1,14 @@
 # Senet
 
-[![Versione](https://img.shields.io/badge/versione-1.3-blue)](#versioni)
+[![Versione](https://img.shields.io/badge/versione-1.1-blue)](#versioni)
 [![Licenza: AGPL v3](https://img.shields.io/badge/licenza-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-222?logo=github)](#pubblicazione-su-github-pages)
 [![HTML5](https://img.shields.io/badge/HTML5-single%20file-E34F26?logo=html5&logoColor=white)](index.html)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?logo=javascript&logoColor=black)](index.html)
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000?logo=threedotjs&logoColor=white)](https://threejs.org/)
-[![Lingua](https://img.shields.io/badge/lingua-italiano-green)](#)
+[![Lingua](https://img.shields.io/badge/lingua-italiano%20%7C%20inglese-green)](#)
 
-Versione per browser del Senet, il gioco da tavolo dell'Antico Egitto. È una singola pagina HTML, senza build e senza installazione. Condivide l'architettura del [Gioco Reale di Ur](https://github.com/TagtTheSpellcaster/Gioco-Reale-di-Ur): motore di gioco separato dall'interfaccia, dadi in 3D, animazioni, audio sintetizzato, storia e regole illustrate.
-
-[Puoi giocarlo qui](https://tagtthespellcaster.github.io/Senet/)
+Versione per browser del Senet, il gioco da tavolo dell'Antico Egitto. È una singola pagina HTML, senza build e senza installazione. Condivide l'architettura del [Gioco Reale di Ur](https://github.com/): motore di gioco separato dall'interfaccia, dadi in 3D, animazioni, audio sintetizzato, storia e regole illustrate.
 
 ## Caratteristiche
 
@@ -25,6 +23,7 @@ Versione per browser del Senet, il gioco da tavolo dell'Antico Egitto. È una si
 - **Audio** sintetizzato con Web Audio: effetti sonori (attivi di default) e colonna sonora di ispirazione egizia (disattivata di default), con scala doppia armonica, arpa, flauto, darbuka e sistro. La scelta è salvata nel browser.
 - **Regole illustrate**: un tutorial animato per ciascun set di regole (19 e 20 passi).
 - **Storia**: sequenza a titoli cinematografici tratta dalla voce «Senet» di Wikipedia.
+- **Italiano e inglese**: selettore IT/EN nell'intestazione; la scelta è salvata nel browser e, in mancanza, si usa la lingua del browser. Cambia anche a partita in corso, nelle regole illustrate e nella storia (le voci già scritte nella cronaca restano nella lingua originale).
 - Tema chiaro e scuro automatico, layout adattabile a schermi piccoli.
 
 ## Regole in breve
@@ -60,6 +59,7 @@ Apri `index.html` in un browser moderno. La pagina carica da CDN, se raggiungibi
 
 | Versione | Contenuto |
 |---|---|
+| 1.1 | Interfaccia in italiano e inglese con selettore della lingua. |
 | 1.0 | Gioco completo con regole CEMEA e Kendall e Bell, animazioni, audio, storia e regole illustrate. |
 
 ## Fonti
