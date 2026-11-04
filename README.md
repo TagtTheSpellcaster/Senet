@@ -1,13 +1,13 @@
 # Senet
 
+[English version](README.en.md)
+
 [![Versione](https://img.shields.io/badge/versione-1.1-blue)](#versioni)
 [![Licenza: AGPL v3](https://img.shields.io/badge/licenza-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-222?logo=github)](#pubblicazione-su-github-pages)
 [![HTML5](https://img.shields.io/badge/HTML5-single%20file-E34F26?logo=html5&logoColor=white)](index.html)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?logo=javascript&logoColor=black)](index.html)
 [![Three.js](https://img.shields.io/badge/Three.js-r128-000?logo=threedotjs&logoColor=white)](https://threejs.org/)
-
-[English version](README.en.md)
 
 Versione per browser del Senet, il gioco da tavolo dell'Antico Egitto. È una singola pagina HTML, senza build e senza installazione. Condivide l'architettura del [Gioco Reale di Ur](https://github.com/): motore di gioco separato dall'interfaccia, dadi in 3D, animazioni, audio sintetizzato, storia e regole illustrate.
 
